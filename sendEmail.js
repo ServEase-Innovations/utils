@@ -1,28 +1,25 @@
-const nodemailer = require('nodemailer');
+const sendgrid = require('@sendgrid/mail');
 
-// Create a transporter using the SMTP server information
-let transporter = nodemailer.createTransport({
-  host: 'smtp.mailer91.com',  // SMTP server
-  port: 587,  // SMTP port (587 is commonly used for TLS)
-  secure: false,  // Use STARTTLS (false for port 587)
-  auth: {
-    user: 'emailer@gelqsr.mailer91.com',  // Your SMTP username
-    pass: 'bUnfvruLq6LDk9Eg'  // Your SMTP password (replace with actual password)
-  }
-});
+// Set your SendGrid API key
+sendgrid.setApiKey('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');
 
-// Define the email options
-let mailOptions = {
-  from: '"No-reply" <No-reply@gelqsr.mailer91.com>',  // Sender address
-  to: 'maity.ronit18@gmail.com',  // List of recipients
-  subject: 'Welcome to MSG91',  // Subject line
-  text: 'Testing some MSG91 awesomness!'  // Plain text body
+// Set up the email data with the dynamic template
+const mailOptions = {
+  from: 'ServEaso <ronit.maity@serveaseinnovation.com>', // Sender address
+  to: 'maity.ronit18@gmail.com', // Recipient's email address
+  subject: 'Welcome', // Subject line
+  templateId: 'd-8d3a74a3e23d4de5a569007b280570c7', // The dynamic template ID
+  dynamic_template_data: {
+    name: 'Ronit', // Dynamic data to be injected into the template
+  },
 };
 
-// Send mail using the transporter
-transporter.sendMail(mailOptions, (error, info) => {
-  if (error) {
-    return console.log('Error occurred:', error);
-  }
-  console.log('Message sent:', info.messageId);
-});
+// Send the email using SendGrid
+sendgrid
+  .send(mailOptions)
+  .then((response) => {
+    console.log('Email sent:', response[0].statusCode);
+  })
+  .catch((error) => {
+    console.error('Error sending email:', error);
+  });
