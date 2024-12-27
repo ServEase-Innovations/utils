@@ -1,52 +1,51 @@
 const express = require('express');
-const nodemailer = require('nodemailer');
-const path = require('path');  // Required to serve HTML file
+const sendgrid = require('@sendgrid/mail');
+const bodyParser = require('body-parser');
+
 const app = express();
 
-// Serve static files (HTML, CSS, JS)
-app.use(express.static(path.join(__dirname, 'public')));  // assuming your HTML is in the 'public' folder
+// Set SendGrid API Key
+sendgrid.setApiKey('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');
 
-// Middleware to parse JSON bodies
-app.use(express.json());
+// Middleware to parse JSON data
+app.use(bodyParser.json());
 
-// Create a transporter using SMTP server information
-let transporter = nodemailer.createTransport({
-  host: 'smtp.mailer91.com',
-  port: 587,
-  secure: false,
-  auth: {
-    user: 'emailer@gelqsr.mailer91.com',
-    pass: 'bUnfvruLq6LDk9Eg'
-  }
-});
+// Serve static files (for the front-end)
+app.use(express.static('public'));
 
-// POST route for sending emails
+// POST route to send email
 app.post('/send-email', (req, res) => {
-  const { to, subject, text } = req.body;
+  const { email, name } = req.body; // Get user data from the request body
 
-  // Check if required fields are provided
-  if (!to || !subject || !text) {
-    return res.status(400).json({ error: 'Missing required fields: to, subject, text' });
+  // Check if email and name are provided
+  if (!email || !name) {
+    return res.status(400).json({ error: 'Email and Name are required' });
   }
 
-  let mailOptions = {
-    from: '"No-reply" <No-reply@gelqsr.mailer91.com>',
-    to: to,
-    subject: subject,
-    text: text
+  const mailOptions = {
+    from: 'ServEaso <ronit.maity@serveaseinnovation.com>', // Sender address
+    to: email, // Recipient's email address
+    subject: 'Welcome!', // Subject line
+    templateId: 'd-8d3a74a3e23d4de5a569007b280570c7', // Dynamic template ID
+    dynamic_template_data: {
+      name: name, // Pass dynamic data (name) into the template
+    },
   };
 
-  // Send email using the transporter
-  transporter.sendMail(mailOptions, (error, info) => {
-    if (error) {
-      return res.status(500).json({ error: 'Error occurred while sending email', details: error });
-    }
-    res.status(200).json({ message: 'Email sent successfully', messageId: info.messageId });
-  });
+  // Send the email
+  sendgrid
+    .send(mailOptions)
+    .then(() => {
+      res.status(200).json({ message: 'Email sent successfully!' });
+    })
+    .catch((error) => {
+      console.error('Error sending email:', error);
+      res.status(500).json({ error: 'Error sending email', details: error });
+    });
 });
 
-// Start the server on port 3000
-const PORT = process.env.PORT || 3000;
+// Start the server
+const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
