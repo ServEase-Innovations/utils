@@ -1,11 +1,15 @@
 const express = require('express');
 const sendgrid = require('@sendgrid/mail');
 const bodyParser = require('body-parser');
+const cors = require('cors'); // Import CORS
 
 const app = express();
 
 // Set SendGrid API Key
 sendgrid.setApiKey('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');
+
+// Use CORS middleware (Allow all origins by default)
+app.use(cors()); // This will allow all origins by default. If you want to restrict, you can configure it
 
 // Middleware to parse JSON data
 app.use(bodyParser.json());
