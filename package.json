@@ -16,8 +16,13 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "mongodb": "^6.12.0",
     "node-fetch": "^3.3.2",
     "nodemailer": "^6.9.16",
-    "smtp-server": "^3.13.6"
+    "pg": "^8.13.1",
+    "smtp-server": "^3.13.6",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "tunnel-ssh": "^5.2.0"
   }
 }
