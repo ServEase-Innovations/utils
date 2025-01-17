@@ -12,7 +12,7 @@ async function fetchRecords() {
     useNewUrlParser: true,
     useUnifiedTopology: true,
     tls: true,  // Enable TLS encryption
-    tlsCAFile: './global-bundle.p7b',  // Path to the CA certificate
+    tlsCAFile: 'global-bundle.p7b',  // Path to the CA certificate
   });
 
   try {
