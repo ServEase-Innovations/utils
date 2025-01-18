@@ -264,16 +264,29 @@ app.put('/records/:id', async (req, res) => {
 
   // Check if the update data is valid
   if (!updateData || Object.keys(updateData).length === 0) {
-    return res.status(400).json({ message: 'Invalid data provided' });
+    return res.status(400).json({ message: 'Invalid data provided. At least one field must be updated.' });
+  }
+
+  // Check if the fields that can be updated are valid
+  const allowedFields = ['name', 'price', 'description'];
+  for (let key in updateData) {
+    if (!allowedFields.includes(key)) {
+      return res.status(400).json({ message: `Field '${key}' is not updatable` });
+    }
   }
 
   // Update the record in MongoDB
-  const result = await updateRecord(recordId, updateData);
+  try {
+    const result = await updateRecord(recordId, updateData);
 
-  if (result && result.modifiedCount > 0) {
-    return res.status(200).json({ message: 'Record updated successfully' });
-  } else {
-    return res.status(404).json({ message: 'Record not found or no changes made' });
+    if (result && result.modifiedCount > 0) {
+      return res.status(200).json({ message: 'Record updated successfully' });
+    } else {
+      return res.status(404).json({ message: 'Record not found or no changes made' });
+    }
+  } catch (error) {
+    console.error('Error updating record:', error);
+    return res.status(500).json({ message: 'Internal Server Error' });
   }
 });
 
