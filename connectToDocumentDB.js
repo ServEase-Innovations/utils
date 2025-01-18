@@ -89,6 +89,29 @@ async function fetchRecordById(recordId) {
   }
 }
 
+// MongoDB Add New Record
+async function addNewRecord(newRecord) {
+  const client = new MongoClient(uri, {
+    useUnifiedTopology: true,
+    tls: true,
+    tlsCAFile: './global-bundle.pem',  // Path to the CA file
+  });
+
+  try {
+    await client.connect();
+    const db = client.db("pricing");
+    const collection = db.collection("Servease_pricing");
+
+    const result = await collection.insertOne(newRecord);
+    return result;
+  } catch (error) {
+    console.error("Error occurred while adding record:", error);
+    return null;
+  } finally {
+    await client.close();
+  }
+}
+
 /**
  * @swagger
  * /records:
@@ -112,6 +135,26 @@ async function fetchRecordById(recordId) {
  *                     type: number
  *                   description:
  *                     type: string
+ *   post:
+ *     summary: Add a new record to the database
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               price:
+ *                 type: number
+ *               description:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Record added successfully
+ *       400:
+ *         description: Invalid data provided
  * /records/{id}:
  *   get:
  *     summary: Get a record by its ID
@@ -178,6 +221,24 @@ app.get('/records', async (req, res) => {
   res.json(records);
 });
 
+app.post('/records', async (req, res) => {
+  const newRecord = req.body;  // Get the data from the request body
+
+  // Validate the incoming data
+  if (!newRecord.name || !newRecord.price || !newRecord.description) {
+    return res.status(400).json({ message: 'Missing required fields (name, price, description)' });
+  }
+
+  // Add the new record to the MongoDB collection
+  const result = await addNewRecord(newRecord);
+
+  if (result && result.insertedCount > 0) {
+    return res.status(201).json({ message: 'Record added successfully', data: newRecord });
+  } else {
+    return res.status(500).json({ message: 'Failed to add record' });
+  }
+});
+
 app.get('/records/:id', async (req, res) => {
   const recordId = req.params.id;  // Get the record ID from URL params
 
@@ -203,11 +264,6 @@ app.put('/records/:id', async (req, res) => {
   // Check if the update data is valid
   if (!updateData || Object.keys(updateData).length === 0) {
     return res.status(400).json({ message: 'Invalid data provided' });
-  }
-
-  // Check that at least one field is provided (optional)
-  if (!updateData.pricePerMonth && !updateData.serviceType) {
-    return res.status(400).json({ message: 'At least one field (pricePerMonth or serviceType) must be provided' });
   }
 
   // Update the record in MongoDB
