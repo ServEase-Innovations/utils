@@ -115,7 +115,7 @@ async function connectToDB() {
   const client = new MongoClient(uri, {
     useUnifiedTopology: true,
     tls: true,
-    tlsCAFile: './global-bundle.pem',
+    tlsCAFile: '../../global-bundle.pem',
   });
   await client.connect();
   const db = client.db("pricing");
