@@ -283,9 +283,13 @@ app.get('/records/:id', async (req, res) => {
   }
 });
 
+
 app.put('/records/:id', async (req, res) => {
   const recordId = req.params.id;  // Get the record ID from URL params
   const updateData = req.body;  // Get the update data from request body
+
+  // Log the incoming request body for debugging
+  console.log('Received PUT data:', updateData);
 
   // Check if the update data is valid
   if (!updateData || Object.keys(updateData).length === 0) {
