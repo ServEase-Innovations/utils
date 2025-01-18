@@ -142,7 +142,6 @@ async function fetchRecordById(recordId) {
  *         description: Invalid ID format
  *       404:
  *         description: Record not found
- * /records/{id}:
  *   put:
  *     summary: Update a record in the database
  *     parameters:
