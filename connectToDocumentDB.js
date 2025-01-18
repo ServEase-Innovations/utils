@@ -90,8 +90,23 @@ app.get('/records', async (req, res) => {
   res.json(records);
 });
 
-app.get('/hello', (req, res) => {
-  res.json({ message: 'Hello World' });
+app.put('/records/:id', async (req, res) => {
+  const recordId = req.params.id;  // Get the record ID from URL params
+  const updateData = req.body;  // Get the update data from request body
+
+  // Check if the update data is valid
+  if (!updateData || Object.keys(updateData).length === 0) {
+    return res.status(400).json({ message: 'Invalid data provided' });
+  }
+
+  // Update the record in MongoDB
+  const result = await updateRecord(recordId, updateData);
+
+  if (result && result.modifiedCount > 0) {
+    return res.status(200).json({ message: 'Record updated successfully' });
+  } else {
+    return res.status(404).json({ message: 'Record not found or no changes made' });
+  }
 });
 
 // Start the Server
