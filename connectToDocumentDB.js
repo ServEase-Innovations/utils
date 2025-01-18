@@ -231,8 +231,9 @@ app.post('/records', async (req, res) => {
   }
 
   try {
-    const result = await addRecord(recordData);
-    res.status(200).json({ message: 'Record added successfully', result });
+    // Correct function name: addNewRecord instead of addRecord
+    const result = await addNewRecord(recordData);
+    res.status(201).json({ message: 'Record added successfully', result });
   } catch (error) {
     console.error('Error adding record:', error);
     res.status(500).json({ message: 'Internal Server Error' });
