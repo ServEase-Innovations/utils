@@ -9,7 +9,6 @@ const port = 3000;
 
 // MongoDB URI and SSL certificate
 const uri = "mongodb://servease:servease@docdb-2025-01-12-14-21-33.c1ccc8a0u3nt.ap-south-1.docdb.amazonaws.com:27017,docdb-2025-01-12-14-21-332.c1ccc8a0u3nt.ap-south-1.docdb.amazonaws.com:27017,docdb-2025-01-12-14-21-333.c1ccc8a0u3nt.ap-south-1.docdb.amazonaws.com:27017/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false";
-// const uri = "mongodb://servease:servease@docdb-2025-01-12-14-21-33.c1ccc8a0u3nt.ap-south-1.docdb.amazonaws.com:27017,docdb-2025-01-12-14-21-332.c1ccc8a0u3nt.ap-south-1.docdb.amazonaws.com:27017,docdb-2025-01-12-14-21-333.c1ccc8a0u3nt.ap-south-1.docdb.amazonaws.com:27017/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred";
 const sslCA = fs.readFileSync('./global-bundle.p7b');  // Path to the CA file
 
 // Express JSON middleware for parsing JSON body
@@ -113,6 +112,33 @@ async function addNewRecord(newRecord) {
   }
 }
 
+// MongoDB Update Record
+async function updateRecord(recordId, updateData) {
+  const client = new MongoClient(uri, {
+    useUnifiedTopology: true,
+    tls: true,
+    tlsCAFile: './global-bundle.pem',  // Path to the CA file
+  });
+
+  try {
+    await client.connect();
+    const db = client.db("pricing");
+    const collection = db.collection("Servease_pricing");
+
+    const result = await collection.updateOne(
+      { _id: new ObjectId(recordId) },
+      { $set: updateData }
+    );
+
+    return result;
+  } catch (error) {
+    console.error("Error occurred while updating record:", error);
+    return null;
+  } finally {
+    await client.close();
+  }
+}
+
 /**
  * @swagger
  * /records:
@@ -195,26 +221,26 @@ async function addNewRecord(newRecord) {
  *         description: The ID of the record to update
  *         schema:
  *           type: string
- *       - in: body
- *         name: record
- *         description: The record data to update
- *         required: true
- *         schema:
- *           type: object
- *           properties:
- *             name:
- *               type: string
- *             price:
- *               type: number
- *             description:
- *               type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               price:
+ *                 type: number
+ *               description:
+ *                 type: string
  *     responses:
  *       200:
  *         description: Record updated successfully
  *       400:
  *         description: Invalid ID or data
  *       404:
- *         description: Record not found
+ *         description: Record not found or no changes made
  */
 
 app.get('/records', async (req, res) => {
@@ -231,7 +257,6 @@ app.post('/records', async (req, res) => {
   }
 
   try {
-    // Correct function name: addNewRecord instead of addRecord
     const result = await addNewRecord(recordData);
     res.status(201).json({ message: 'Record added successfully', result });
   } catch (error) {
