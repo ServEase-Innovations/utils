@@ -66,8 +66,8 @@ async function fetchRecords() {
   }
 }
 
-// MongoDB Update Record
-async function updateRecord(recordId, updateData) {
+// MongoDB Fetch Record by ID
+async function fetchRecordById(recordId) {
   const client = new MongoClient(uri, {
     useUnifiedTopology: true,
     tls: true,
@@ -79,14 +79,10 @@ async function updateRecord(recordId, updateData) {
     const db = client.db("pricing");
     const collection = db.collection("Servease_pricing");
 
-    const result = await collection.updateOne(
-      { _id: new ObjectId(recordId) }, // Convert the id to ObjectId
-      { $set: updateData }
-    );
-
-    return result;
+    const record = await collection.findOne({ _id: new ObjectId(recordId) });
+    return record;
   } catch (error) {
-    console.error("Error occurred while updating record:", error);
+    console.error("Error occurred while fetching record:", error);
     return null;
   } finally {
     await client.close();
@@ -116,6 +112,36 @@ async function updateRecord(recordId, updateData) {
  *                     type: number
  *                   description:
  *                     type: string
+ * /records/{id}:
+ *   get:
+ *     summary: Get a record by its ID
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: The ID of the record to retrieve
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: A single record from the database
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 _id:
+ *                   type: string
+ *                 name:
+ *                   type: string
+ *                 price:
+ *                   type: number
+ *                 description:
+ *                   type: string
+ *       400:
+ *         description: Invalid ID format
+ *       404:
+ *         description: Record not found
  * /records/{id}:
  *   put:
  *     summary: Update a record in the database
@@ -153,14 +179,27 @@ app.get('/records', async (req, res) => {
   res.json(records);
 });
 
-app.put('/records/:id', async (req, res) => {
+app.get('/records/:id', async (req, res) => {
   const recordId = req.params.id;  // Get the record ID from URL params
-  const updateData = req.body;  // Get the update data from request body
 
   // Validate the ObjectId format
   if (!ObjectId.isValid(recordId)) {
     return res.status(400).json({ message: 'Invalid ID format' });
   }
+
+  // Fetch the record by ID
+  const record = await fetchRecordById(recordId);
+
+  if (record) {
+    return res.status(200).json(record);
+  } else {
+    return res.status(404).json({ message: 'Record not found' });
+  }
+});
+
+app.put('/records/:id', async (req, res) => {
+  const recordId = req.params.id;  // Get the record ID from URL params
+  const updateData = req.body;  // Get the update data from request body
 
   // Check if the update data is valid
   if (!updateData || Object.keys(updateData).length === 0) {
@@ -168,9 +207,8 @@ app.put('/records/:id', async (req, res) => {
   }
 
   // Check that at least one field is provided (optional)
-  // Modify the validation to be flexible to your use case
-  if (!updateData.name && !updateData.price && !updateData.description) {
-    return res.status(400).json({ message: 'At least one field (name, price, or description) must be provided' });
+  if (!updateData.pricePerMonth && !updateData.serviceType) {
+    return res.status(400).json({ message: 'At least one field (pricePerMonth or serviceType) must be provided' });
   }
 
   // Update the record in MongoDB
