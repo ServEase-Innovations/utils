@@ -1,7 +1,7 @@
 const { MongoClient, ObjectId } = require('mongodb');
 const fs = require('fs');
 
-const uri = "mongodb://your-mongo-uri"; // Replace with your MongoDB URI
+const uri = "mongodb://servease:servease@docdb-2025-01-12-14-21-33.c1ccc8a0u3nt.ap-south-1.docdb.amazonaws.com:27017,docdb-2025-01-12-14-21-332.c1ccc8a0u3nt.ap-south-1.docdb.amazonaws.com:27017,docdb-2025-01-12-14-21-333.c1ccc8a0u3nt.ap-south-1.docdb.amazonaws.com:27017/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false"; // Replace with your MongoDB URI
 const sslCA = fs.readFileSync('./global-bundle.p7b'); // Path to the CA file
 
 
