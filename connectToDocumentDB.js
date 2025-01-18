@@ -84,7 +84,38 @@ async function fetchRecords() {
  *                     type: number
  *                   description:
  *                     type: string
+ * * /records/{id}:
+ *   put:
+ *     summary: Update a record in the database
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: The ID of the record to update
+ *         schema:
+ *           type: string
+ *       - in: body
+ *         name: record
+ *         description: The record data to update
+ *         required: true
+ *         schema:
+ *           type: object
+ *           properties:
+ *             name:
+ *               type: string
+ *             price:
+ *               type: number
+ *             description:
+ *               type: string
+ *     responses:
+ *       200:
+ *         description: Record updated successfully
+ *       400:
+ *         description: Invalid ID or data
+ *       404:
+ *         description: Record not found
  */
+
 app.get('/records', async (req, res) => {
   const records = await fetchRecords();
   res.json(records);
