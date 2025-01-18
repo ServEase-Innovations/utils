@@ -12,6 +12,9 @@ const uri = "mongodb://servease:servease@docdb-2025-01-12-14-21-33.c1ccc8a0u3nt.
 const sslCA = fs.readFileSync('./global-bundle.p7b');  // Path to the CA file
 
 // Swagger Definition
+const serverUrl = process.env.BASE_URL || 'http://localhost:3000';
+
+// Swagger Definition
 const swaggerDefinition = {
   openapi: '3.0.0',
   info: {
@@ -21,10 +24,11 @@ const swaggerDefinition = {
   },
   servers: [
     {
-      url: 'http://localhost:3000',
+      url: serverUrl,  // Use dynamic URL
     },
   ],
 };
+
 
 // Swagger Options
 const options = {
