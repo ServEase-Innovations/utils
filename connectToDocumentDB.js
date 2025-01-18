@@ -1,7 +1,7 @@
 const express = require('express');
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
 const fs = require('fs');
 
 const app = express();
@@ -10,6 +10,9 @@ const port = 3000;
 // MongoDB URI and SSL certificate
 const uri = "mongodb://servease:servease@docdb-2025-01-12-14-21-33.c1ccc8a0u3nt.ap-south-1.docdb.amazonaws.com:27017,docdb-2025-01-12-14-21-332.c1ccc8a0u3nt.ap-south-1.docdb.amazonaws.com:27017,docdb-2025-01-12-14-21-333.c1ccc8a0u3nt.ap-south-1.docdb.amazonaws.com:27017/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred";
 const sslCA = fs.readFileSync('./global-bundle.p7b');  // Path to the CA file
+
+// Express JSON middleware for parsing JSON body
+app.use(express.json());
 
 // Swagger Definition
 const serverUrl = process.env.BASE_URL || 'http://3.110.168.35:3000';
@@ -28,7 +31,6 @@ const swaggerDefinition = {
     },
   ],
 };
-
 
 // Swagger Options
 const options = {
@@ -58,6 +60,34 @@ async function fetchRecords() {
     return records;
   } catch (error) {
     console.error("Error occurred while fetching records:", error);
+    return [];
+  }
+}
+
+// MongoDB Update Record
+async function updateRecord(recordId, updateData) {
+  const client = new MongoClient(uri, {
+    useUnifiedTopology: true,
+    tls: true,
+    tlsCAFile: './global-bundle.pem',  // Path to the CA file
+  });
+
+  try {
+    await client.connect();
+    const db = client.db("pricing");
+    const collection = db.collection("Servease_pricing");
+
+    const result = await collection.updateOne(
+      { _id: new ObjectId(recordId) }, // Convert the id to ObjectId
+      { $set: updateData }
+    );
+
+    return result;
+  } catch (error) {
+    console.error("Error occurred while updating record:", error);
+    return null;
+  } finally {
+    await client.close();
   }
 }
 
@@ -84,7 +114,7 @@ async function fetchRecords() {
  *                     type: number
  *                   description:
  *                     type: string
- * * /records/{id}:
+ * /records/{id}:
  *   put:
  *     summary: Update a record in the database
  *     parameters:
