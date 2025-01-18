@@ -61,6 +61,8 @@ async function fetchRecords() {
   } catch (error) {
     console.error("Error occurred while fetching records:", error);
     return [];
+  } finally {
+    await client.close();
   }
 }
 
@@ -155,14 +157,20 @@ app.put('/records/:id', async (req, res) => {
   const recordId = req.params.id;  // Get the record ID from URL params
   const updateData = req.body;  // Get the update data from request body
 
+  // Validate the ObjectId format
+  if (!ObjectId.isValid(recordId)) {
+    return res.status(400).json({ message: 'Invalid ID format' });
+  }
+
   // Check if the update data is valid
   if (!updateData || Object.keys(updateData).length === 0) {
     return res.status(400).json({ message: 'Invalid data provided' });
   }
 
   // Check that at least one field is provided (optional)
-  if (!updateData.pricePerMonth && !updateData.serviceType) {
-    return res.status(400).json({ message: 'At least one field (pricePerMonth or serviceType) must be provided' });
+  // Modify the validation to be flexible to your use case
+  if (!updateData.name && !updateData.price && !updateData.description) {
+    return res.status(400).json({ message: 'At least one field (name, price, or description) must be provided' });
   }
 
   // Update the record in MongoDB
