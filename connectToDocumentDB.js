@@ -160,6 +160,11 @@ app.put('/records/:id', async (req, res) => {
     return res.status(400).json({ message: 'Invalid data provided' });
   }
 
+  // Check that at least one field is provided (optional)
+  if (!updateData.pricePerMonth && !updateData.serviceType) {
+    return res.status(400).json({ message: 'At least one field (pricePerMonth or serviceType) must be provided' });
+  }
+
   // Update the record in MongoDB
   const result = await updateRecord(recordId, updateData);
 
