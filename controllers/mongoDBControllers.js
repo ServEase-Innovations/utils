@@ -109,6 +109,31 @@ const sslCA = fs.readFileSync('./global-bundle.p7b'); // Path to the CA file
  *         description: Record not found or no changes made
  */
 
+/**
+ * @swagger
+ * /upload:
+ *   post:
+ *     summary: Upload an Excel file and insert its data into MongoDB
+ *     tags: [Upload]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Successfully inserted the records into MongoDB
+ *       400:
+ *         description: No file uploaded or invalid file format
+ *       500:
+ *         description: Error processing the Excel file or inserting data into MongoDB
+ */
+
 
 // Function to connect to the database
 async function connectToDB() {
