@@ -152,7 +152,7 @@ const sslCA = fs.readFileSync('./global-bundle.p7b'); // Path to the CA file
  */
 
 
-async function deleteAll () {
+const deleteAll = async (req, res) => {
   const { db, client } = await connectToDB();
   try {
     const collection = db.collection('Servease_pricing');
@@ -171,8 +171,7 @@ async function deleteAll () {
   } finally {
     await client.close();
   }
-
-}
+};
 
 // Function to connect to the database
 async function connectToDB() {
