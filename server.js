@@ -3,7 +3,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const swaggerUi = require('swagger-ui-express');
 const { swaggerSpec } = require('./docs/swaggerDocs');
-const { getRecords, getRecordById, addRecord, updateRecord, uploadExcel } = require('./controllers/mongoDBControllers');
+const { getRecords, getRecordById, addRecord, updateRecord, uploadExcel , deleteAll } = require('./controllers/mongoDBControllers');
 const emailRoutes = require('./routes/emailRoutes'); // Import email routes
 const uploadRoutes = require('./routes/uploadRoutes');
 const { connectToDB } = require('./controllers/mongoDBControllers')
@@ -124,6 +124,8 @@ app.put('/records/:id', async (req, res) => {
 
 
 app.post('/upload', upload.single('file'), uploadExcel);
+
+app.delete('/delete-all' , deleteAll);
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);

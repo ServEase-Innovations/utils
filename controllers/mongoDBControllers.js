@@ -135,6 +135,44 @@ const sslCA = fs.readFileSync('./global-bundle.p7b'); // Path to the CA file
  *         description: Error processing the Excel file or inserting data into MongoDB
  */
 
+// Route to delete all records from the collection
+/**
+ * @swagger
+ * /delete-all:
+ *   delete:
+ *     summary: Delete all records in the Servease_pricing collection
+ *     description: Deletes all records from the "Servease_pricing" collection in the MongoDB database.
+ *     responses:
+ *       200:
+ *         description: Successfully deleted all records.
+ *       404:
+ *         description: No records found to delete.
+ *       500:
+ *         description: Internal server error.
+ */
+
+
+async function deleteAll () {
+  const { db, client } = await connectToDB();
+  try {
+    const collection = db.collection('Servease_pricing');
+    
+    // Delete all records in the collection
+    const result = await collection.deleteMany({});
+    
+    if (result.deletedCount > 0) {
+      return res.status(200).send(`Successfully deleted ${result.deletedCount} records.`);
+    } else {
+      return res.status(404).send('No records found to delete.');
+    }
+  } catch (err) {
+    console.error('Error deleting records:', err);
+    res.status(500).send('Error deleting records from MongoDB.');
+  } finally {
+    await client.close();
+  }
+
+}
 
 // Function to connect to the database
 async function connectToDB() {
@@ -242,5 +280,6 @@ module.exports = {
   getRecordById,
   addRecord,
   updateRecord,
-  uploadExcel
+  uploadExcel,
+  deleteAll
 };
