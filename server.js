@@ -3,11 +3,20 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const swaggerUi = require('swagger-ui-express');
 const { swaggerSpec } = require('./docs/swaggerDocs');
-const { getRecords, getRecordById, addRecord, updateRecord } = require('./controllers/mongoDBControllers');
+const { getRecords, getRecordById, addRecord, updateRecord, uploadExcel } = require('./controllers/mongoDBControllers');
 const emailRoutes = require('./routes/emailRoutes'); // Import email routes
+const uploadRoutes = require('./routes/uploadRoutes');
+const { connectToDB } = require('./controllers/mongoDBControllers')
+const multer = require('multer');
+const xlsx = require('xlsx');
 
 const app = express();
 const port = 3000;
+
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
+
+
 
 // Use CORS middleware (Allow all origins by default)
 app.use(cors());
@@ -78,6 +87,43 @@ app.put('/records/:id', async (req, res) => {
   }
 });
 
+// app.post('/upload', upload.single('file'), async (req, res) => {
+//   if (!req.file) {
+//     return res.status(400).json({ message: 'No file uploaded.' });
+//   }
+
+//   try {
+//     // Parse the Excel file buffer
+//     const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
+//     const sheetName = workbook.SheetNames[0]; // Assuming the data is in the first sheet
+//     const sheet = workbook.Sheets[sheetName];
+//     const jsonData = xlsx.utils.sheet_to_json(sheet);
+
+//     if (jsonData.length === 0) {
+//       return res.status(400).json({ message: 'No data found in the Excel file.' });
+//     }
+
+//     // Connect to MongoDB and insert data
+//     const { db, client } = await connectToDB();
+//     const collection = db.collection('Servease_pricing');
+
+//     // Insert data into MongoDB
+//     const result = await collection.insertMany(jsonData);
+
+//     // Check if records were inserted successfully
+//     if (result.insertedCount > 0) {
+//       return res.status(200).json({ message: `Successfully inserted ${result.insertedCount} records.` });
+//     } else {
+//       return res.status(500).json({ message: 'Error inserting records into MongoDB.' });
+//     }
+//   } catch (err) {
+//     console.error('Error processing the Excel file:', err);
+//     return res.status(500).json({ message: 'Error processing the Excel file.' });
+//   }
+// });
+
+
+app.post('/upload', upload.single('file'), uploadExcel);
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);

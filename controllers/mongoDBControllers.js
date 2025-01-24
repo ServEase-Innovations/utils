@@ -1,5 +1,6 @@
 const { MongoClient, ObjectId } = require('mongodb');
 const fs = require('fs');
+const xlsx = require('xlsx');
 
 const uri = "mongodb://servease:servease@docdb-2025-01-12-14-21-33.c1ccc8a0u3nt.ap-south-1.docdb.amazonaws.com:27017,docdb-2025-01-12-14-21-332.c1ccc8a0u3nt.ap-south-1.docdb.amazonaws.com:27017,docdb-2025-01-12-14-21-333.c1ccc8a0u3nt.ap-south-1.docdb.amazonaws.com:27017/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false"; // Replace with your MongoDB URI
 const sslCA = fs.readFileSync('./global-bundle.p7b'); // Path to the CA file
@@ -210,9 +211,36 @@ async function updateRecord(recordId, updateData) {
   }
 }
 
+const uploadExcel = async (req, res) => {
+  if (!req.file) {
+    return res.status(400).send('No file uploaded.');
+  }
+
+  const { db, client } = await connectToDB();
+  try {
+    // Parse the Excel file buffer
+    const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const jsonData = xlsx.utils.sheet_to_json(sheet);
+
+    // Insert data into MongoDB
+    const collection = db.collection("Servease_pricing");
+    const result = await collection.insertMany(jsonData);
+    res.status(200).send(`Successfully inserted ${result.insertedCount} records.`);
+  } catch (err) {
+    console.error('Error processing the Excel file:', err);
+    res.status(500).send('Error processing the Excel file.');
+  }
+  finally {
+    await client.close();
+  }
+};
+
 module.exports = {
   getRecords,
   getRecordById,
   addRecord,
   updateRecord,
+  uploadExcel
 };
