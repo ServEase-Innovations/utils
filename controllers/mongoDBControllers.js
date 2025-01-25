@@ -351,26 +351,26 @@ async function addRecord(newRecord) {
  }
 
  async function deleteRecord (req, res) {
-  const { collection, filter } = req.body;
+  const { id } = req.params;
 
-  if (!collection || !filter) {
-    return res.status(400).send({ error: 'Collection and filter are required' });
+  if (!ObjectId.isValid(id)) {
+    return res.status(400).send({ error: 'Invalid ID format' });
   }
 
   try {
     const db = await connectToDb();
-    const result = await db.collection(collection).deleteMany(filter); // deleteMany is used here, change to deleteOne for single item deletion
+    const collection = db.collection('Servease_pricing'); // Replace with your collection name
+
+    const result = await collection.deleteOne({ _id: new ObjectId(id) });
 
     if (result.deletedCount === 0) {
-      return res.status(404).send({ message: 'No documents matched the filter' });
+      return res.status(404).send({ message: 'Record not found' });
     }
 
-    return res.status(200).send({
-      message: `${result.deletedCount} document(s) deleted`,
-    });
+    return res.status(200).send({ message: 'Record successfully deleted' });
   } catch (error) {
-    console.error('Error deleting data:', error);
-    return res.status(500).send({ error: 'Error deleting data from DocumentDB' });
+    console.error('Error deleting record:', error);
+    return res.status(500).send({ error: 'Internal server error' });
   }
 };
  

@@ -73,7 +73,7 @@ app.get('/records/:id', async (req, res) => {
 
 app.put('/records/:id', updateRecord);
 
-app.delete('/delete' , deleteRecord)
+app.delete('/records/:id' , deleteRecord)
 
 app.post('/upload', upload.single('file'), uploadExcel);
 
