@@ -231,9 +231,21 @@ async function addRecord(newRecord) {
 }
 
 // Update an existing record
-async function updateRecord(recordId, updateData) {
-  console.log("getting updated data ==> ", updateData)
-  console.log("getting record ==> ", recordId)
+ // Make sure to import ObjectId
+
+async function updateRecord(req, res) {
+  const recordId = req.params.id;  // Get recordId from URL params
+  const updateData = req.body;      // Get updateData from request body
+
+  console.log("getting updated data ==> ", updateData);
+  console.log("getting record ==> ", recordId);
+
+  // Validate the recordId format
+  if (!ObjectId.isValid(recordId)) {
+    console.error("Invalid ObjectId format");
+    return res.status(400).json({ message: "Invalid ID format" });
+  }
+
   const { db, client } = await connectToDB();
   try {
     // Clean up field names (remove any empty strings or invalid names)
@@ -242,9 +254,9 @@ async function updateRecord(recordId, updateData) {
     );
 
     console.log("Sanitized Update Data: ", sanitizedUpdateData); // Log sanitized data for debugging
-    
+
     const collection = db.collection("Servease_pricing");
-    
+
     // Ensure index exists on _id field
     await collection.createIndex({ _id: 1 });
 
@@ -256,17 +268,19 @@ async function updateRecord(recordId, updateData) {
 
     if (result.modifiedCount > 0) {
       console.log("Record updated successfully!");
+      res.status(200).json({ message: "Record updated successfully!" }); // Send a success response
     } else {
       console.log("No document was updated.");
+      res.status(404).json({ message: "No record found to update." }); // Send a not-found response if no record was updated
     }
-    return result;
   } catch (error) {
     console.error("Error occurred while updating record:", error);
-    return null;
+    res.status(500).json({ message: "Internal server error." }); // Handle errors gracefully
   } finally {
     await client.close();
   }
 }
+
 
 const uploadExcel = async (req, res) => {
   if (!req.file) {
