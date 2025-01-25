@@ -40,12 +40,6 @@ app.get('/records', async (req, res) => {
 
 app.post('/records', async (req, res) => {
   const recordData = req.body;
-
-  // Input validation
-  if (!recordData || !recordData.name || !recordData.price || !recordData.description) {
-    return res.status(400).json({ message: 'Invalid data provided. Name, price, and description are required.' });
-  }
-
   try {
     const result = await addRecord(recordData);
     res.status(201).json({ message: 'Record added successfully', result });

@@ -291,17 +291,8 @@ async function addRecord(newRecord) {
 
  async function updateRecord(req, res) {
 
-  console.log(" req ", req)
-  console.log("res ", res)
-
    const recordId = req.params?.id;  // Get recordId from URL params
    const updateData = req.body;      // Get updateData from request body
- 
-   // Validate the recordId format
-  //  if (!ObjectId.isValid(updateData)) {
-  //    console.error("Invalid ObjectId format");
-  //    return res.status(400).json({ message: "Invalid ID format" });
-  //  }
  
    const { db, client } = await connectToDB();
    try {
