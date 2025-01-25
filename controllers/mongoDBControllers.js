@@ -235,7 +235,6 @@ async function addRecord(newRecord) {
  // Make sure to import ObjectId
 
  async function updateRecord(req, res) {
-  console.log("Request received:", req);
 
    const recordId = req;  // Get recordId from URL params
    const updateData = req.body;      // Get updateData from request body
@@ -273,6 +272,9 @@ async function addRecord(newRecord) {
        { _id: new ObjectId(recordId) },  // Convert the recordId to ObjectId
        { $set: sanitizedUpdateData }     // Only include sanitized fields for update
      );
+
+
+     console.log("result ",result)
  
      if (result.modifiedCount > 0) {
        console.log("Record updated successfully!");
