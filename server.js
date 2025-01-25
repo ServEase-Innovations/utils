@@ -73,7 +73,8 @@ app.get('/records/:id', async (req, res) => {
 app.put('/records/:id', async (req, res) => {
   console.error("i am here ....")
   console.error("req => ", req.body)
-  const recordId = req.id;
+  console.error("recordId => ",recordId)
+  const recordId = req._id;
   const updateData = req.body;
 
   if (!updateData || Object.keys(updateData).length === 0) {
