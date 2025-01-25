@@ -235,10 +235,21 @@ async function updateRecord(recordId, updateData) {
   const { db, client } = await connectToDB();
   try {
     const collection = db.collection("Servease_pricing");
+
+    // Ensure index exists on _id field
+    await collection.createIndex({ _id: 1 });
+
+    // Perform the update operation
     const result = await collection.updateOne(
-      { _id: new ObjectId(recordId) },
+      { _id: new ObjectId(recordId) }, // Convert the recordId to ObjectId here
       { $set: updateData }
     );
+
+    if (result.modifiedCount > 0) {
+      console.log("Record updated successfully!");
+    } else {
+      console.log("No document was updated.");
+    }
     return result;
   } catch (error) {
     console.error("Error occurred while updating record:", error);
