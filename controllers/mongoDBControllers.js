@@ -257,10 +257,10 @@ async function addRecord(newRecord) {
  
      console.log("Sanitized Update Data: ", sanitizedUpdateData); // Log sanitized data for debugging
  
-     if (Object.keys(sanitizedUpdateData).length === 0) {
-       console.error("No valid fields to update");
-       return res.status(400).json({ message: "No valid fields to update" });
-     }
+    //  if (Object.keys(sanitizedUpdateData).length === 0) {
+    //    console.error("No valid fields to update");
+    //    return res.status(400).json({ message: "No valid fields to update" });
+    //  }
  
      const collection = db.collection("Servease_pricing");
  
