@@ -1,6 +1,7 @@
-const { MongoClient, ObjectId } = require('mongodb');
+const { MongoClient } = require('mongodb');
 const fs = require('fs');
 const xlsx = require('xlsx');
+const { ObjectId } = require('mongodb');  // Ensure ObjectId is imported
 
 const uri = "mongodb://servease:servease@docdb-2025-01-12-14-21-33.c1ccc8a0u3nt.ap-south-1.docdb.amazonaws.com:27017,docdb-2025-01-12-14-21-332.c1ccc8a0u3nt.ap-south-1.docdb.amazonaws.com:27017,docdb-2025-01-12-14-21-333.c1ccc8a0u3nt.ap-south-1.docdb.amazonaws.com:27017/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false"; // Replace with your MongoDB URI
 const sslCA = fs.readFileSync('./global-bundle.p7b'); // Path to the CA file
@@ -233,53 +234,62 @@ async function addRecord(newRecord) {
 // Update an existing record
  // Make sure to import ObjectId
 
-async function updateRecord(req, res) {
-  const recordId = req.params.id;  // Get recordId from URL params
-  const updateData = req.body;      // Get updateData from request body
-
-  console.log("getting updated data ==> ", updateData);
-  console.log("getting record ==> ", recordId);
-
-  // Validate the recordId format
-  if (!ObjectId.isValid(recordId)) {
-    console.error("Invalid ObjectId format");
-    return res.status(400).json({ message: "Invalid ID format" });
-  }
-
-  const { db, client } = await connectToDB();
-  try {
-    // Clean up field names (remove any empty strings or invalid names)
-    const sanitizedUpdateData = Object.fromEntries(
-      Object.entries(updateData).filter(([key, value]) => key.trim() !== "" && value !== undefined)
-    );
-
-    console.log("Sanitized Update Data: ", sanitizedUpdateData); // Log sanitized data for debugging
-
-    const collection = db.collection("Servease_pricing");
-
-    // Ensure index exists on _id field
-    await collection.createIndex({ _id: 1 });
-
-    // Perform the update operation
-    const result = await collection.updateOne(
-      { _id: new ObjectId(recordId) },  // Convert the recordId to ObjectId here
-      { $set: sanitizedUpdateData }
-    );
-
-    if (result.modifiedCount > 0) {
-      console.log("Record updated successfully!");
-      res.status(200).json({ message: "Record updated successfully!" }); // Send a success response
-    } else {
-      console.log("No document was updated.");
-      res.status(404).json({ message: "No record found to update." }); // Send a not-found response if no record was updated
-    }
-  } catch (error) {
-    console.error("Error occurred while updating record:", error);
-    res.status(500).json({ message: "Internal server error." }); // Handle errors gracefully
-  } finally {
-    await client.close();
-  }
-}
+ async function updateRecord(req, res) {
+   const recordId = req.params.id;  // Get recordId from URL params
+   const updateData = req.body;      // Get updateData from request body
+ 
+   console.log("getting updated data ==> ", updateData);
+   console.log("getting record ==> ", recordId);
+ 
+   // Validate the recordId format
+   if (!ObjectId.isValid(recordId)) {
+     console.error("Invalid ObjectId format");
+     return res.status(400).json({ message: "Invalid ID format" });
+   }
+ 
+   const { db, client } = await connectToDB();
+   try {
+     // Clean up field names (remove any empty strings, invalid names, or keys with spaces)
+     const sanitizedUpdateData = Object.fromEntries(
+       Object.entries(updateData).filter(([key, value]) => {
+         // Remove empty strings or undefined values and ensure keys are not empty or only spaces
+         return key.trim() !== "" && value !== undefined && key !== "";
+       })
+     );
+ 
+     console.log("Sanitized Update Data: ", sanitizedUpdateData); // Log sanitized data for debugging
+ 
+     if (Object.keys(sanitizedUpdateData).length === 0) {
+       console.error("No valid fields to update");
+       return res.status(400).json({ message: "No valid fields to update" });
+     }
+ 
+     const collection = db.collection("Servease_pricing");
+ 
+     // Ensure index exists on _id field (optional, only if necessary)
+     await collection.createIndex({ _id: 1 });
+ 
+     // Perform the update operation
+     const result = await collection.updateOne(
+       { _id: new ObjectId(recordId) },  // Convert the recordId to ObjectId
+       { $set: sanitizedUpdateData }     // Only include sanitized fields for update
+     );
+ 
+     if (result.modifiedCount > 0) {
+       console.log("Record updated successfully!");
+       return res.status(200).json({ message: "Record updated successfully!" });
+     } else {
+       console.log("No document was updated.");
+       return res.status(404).json({ message: "No record found to update." });
+     }
+   } catch (error) {
+     console.error("Error occurred while updating record:", error);
+     return res.status(500).json({ message: "Internal server error." });
+   } finally {
+     await client.close();
+   }
+ }
+ 
 
 
 const uploadExcel = async (req, res) => {
