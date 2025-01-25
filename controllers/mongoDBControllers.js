@@ -234,15 +234,22 @@ async function addRecord(newRecord) {
 async function updateRecord(recordId, updateData) {
   const { db, client } = await connectToDB();
   try {
-    const collection = db.collection("Servease_pricing");
+    // Clean up field names (remove any empty strings or invalid names)
+    const sanitizedUpdateData = Object.fromEntries(
+      Object.entries(updateData).filter(([key, value]) => key.trim() !== "" && value !== undefined)
+    );
 
+    console.log("Sanitized Update Data: ", sanitizedUpdateData); // Log sanitized data for debugging
+    
+    const collection = db.collection("Servease_pricing");
+    
     // Ensure index exists on _id field
     await collection.createIndex({ _id: 1 });
 
     // Perform the update operation
     const result = await collection.updateOne(
-      { _id: new ObjectId(recordId) }, // Convert the recordId to ObjectId here
-      { $set: updateData }
+      { _id: new ObjectId(recordId) },  // Convert the recordId to ObjectId here
+      { $set: sanitizedUpdateData }
     );
 
     if (result.modifiedCount > 0) {
