@@ -235,6 +235,8 @@ async function addRecord(newRecord) {
  // Make sure to import ObjectId
 
  async function updateRecord(req, res) {
+  console.log("Request received:", body);
+
    const recordId = req.params.id;  // Get recordId from URL params
    const updateData = req.body;      // Get updateData from request body
  
