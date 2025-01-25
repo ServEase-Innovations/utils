@@ -71,9 +71,9 @@ app.get('/records/:id', async (req, res) => {
 });
 
 app.put('/records/:id', async (req, res) => {
-  console.log("i am here ....")
-  console.log("req => ", req)
-  const recordId = req.params.id;
+  console.error("i am here ....")
+  console.error("req => ", req)
+  const recordId = req.id;
   const updateData = req.body;
 
   console.log("record id ", )
