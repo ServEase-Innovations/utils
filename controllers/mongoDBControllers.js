@@ -109,7 +109,62 @@ const sslCA = fs.readFileSync('./global-bundle.p7b'); // Path to the CA file
  *         description: Invalid ID or data
  *       404:
  *         description: Record not found or no changes made
+ *   delete:
+ *     summary: Delete a record from the database
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         description: The ID of the record to delete
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Successfully deleted the record
+ *       400:
+ *         description: Invalid ID format
+ *       404:
+ *         description: Record not found
+ *       500:
+ *         description: Internal server error
+ * /delete-data:
+ *   post:
+ *     summary: Delete data from a specific collection in DocumentDB
+ *     description: Deletes documents from a collection in DocumentDB based on a filter.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               collection:
+ *                 type: string
+ *                 description: The name of the collection to delete from.
+ *                 example: users
+ *               filter:
+ *                 type: object
+ *                 description: The filter to match documents for deletion.
+ *                 example: { "name": "John" }
+ *     responses:
+ *       200:
+ *         description: Successfully deleted documents.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "1 document(s) deleted"
+ *       400:
+ *         description: Bad request, missing collection or filter.
+ *       404:
+ *         description: No documents found matching the filter.
+ *       500:
+ *         description: Internal server error.
  */
+
 
 /**
  * @swagger
@@ -294,6 +349,30 @@ async function addRecord(newRecord) {
      await client.close();
    }
  }
+
+ async function deleteRecord (req, res) {
+  const { collection, filter } = req.body;
+
+  if (!collection || !filter) {
+    return res.status(400).send({ error: 'Collection and filter are required' });
+  }
+
+  try {
+    const db = await connectToDb();
+    const result = await db.collection(collection).deleteMany(filter); // deleteMany is used here, change to deleteOne for single item deletion
+
+    if (result.deletedCount === 0) {
+      return res.status(404).send({ message: 'No documents matched the filter' });
+    }
+
+    return res.status(200).send({
+      message: `${result.deletedCount} document(s) deleted`,
+    });
+  } catch (error) {
+    console.error('Error deleting data:', error);
+    return res.status(500).send({ error: 'Error deleting data from DocumentDB' });
+  }
+};
  
 
 
@@ -329,5 +408,6 @@ module.exports = {
   addRecord,
   updateRecord,
   uploadExcel,
-  deleteAll
+  deleteAll,
+  deleteRecord
 };
