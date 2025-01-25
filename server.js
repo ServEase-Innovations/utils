@@ -72,11 +72,9 @@ app.get('/records/:id', async (req, res) => {
 
 app.put('/records/:id', async (req, res) => {
   console.error("i am here ....")
-  console.error("req => ", req)
+  console.error("req => ", req.body)
   const recordId = req.id;
   const updateData = req.body;
-
-  console.log("record id ", )
 
   if (!updateData || Object.keys(updateData).length === 0) {
     return res.status(400).json({ message: 'Invalid data provided. At least one field must be updated.' });
