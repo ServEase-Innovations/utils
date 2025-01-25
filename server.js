@@ -71,24 +71,26 @@ app.get('/records/:id', async (req, res) => {
   }
 });
 
-app.put('/records/:id', async (req, res) => {
+app.put('/records/:id', updateRecord);
+
+// app.put('/records/:id', async (req, res) => {
  
-  const recordId = req;
-  const updateData = req.body;
+//   const recordId = req;
+//   const updateData = req.body;
 
-  if (!updateData || Object.keys(updateData).length === 0) {
-    return res.status(400).json({ message: 'Invalid data provided. At least one field must be updated.' });
-  }
+//   if (!updateData || Object.keys(updateData).length === 0) {
+//     return res.status(400).json({ message: 'Invalid data provided. At least one field must be updated.' });
+//   }
 
-  const result = await updateRecord(recordId, updateData);
+//   const result = await updateRecord(recordId, updateData);
 
 
-  if (result && result.modifiedCount > 0) {
-    return result.status(200).json({ message: 'Record updated successfully' });
-  } else {
-    return result.status(404).json({ message: 'Record not found or no changes made' });
-  }
-});
+//   if (result && result.modifiedCount > 0) {
+//     return result.status(200).json({ message: 'Record updated successfully' });
+//   } else {
+//     return result.status(404).json({ message: 'Record not found or no changes made' });
+//   }
+// });
 
 // app.post('/upload', upload.single('file'), async (req, res) => {
 //   if (!req.file) {

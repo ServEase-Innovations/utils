@@ -236,60 +236,63 @@ async function addRecord(newRecord) {
 
  async function updateRecord(req, res) {
 
-   const recordId = req;  // Get recordId from URL params
-   const updateData = req.body;      // Get updateData from request body
+  console.log(" req ", req)
+  console.log("res ", res)
+
+  //  const recordId = req;  // Get recordId from URL params
+  //  const updateData = req.body;      // Get updateData from request body
  
-   // Validate the recordId format
-   if (!ObjectId.isValid(updateData)) {
-     console.error("Invalid ObjectId format");
-     return res.status(400).json({ message: "Invalid ID format" });
-   }
+  //  // Validate the recordId format
+  //  if (!ObjectId.isValid(updateData)) {
+  //    console.error("Invalid ObjectId format");
+  //    return res.status(400).json({ message: "Invalid ID format" });
+  //  }
  
-   const { db, client } = await connectToDB();
-   try {
-     // Clean up field names (remove any empty strings, invalid names, or keys with spaces)
-     const sanitizedUpdateData = Object.fromEntries(
-       Object.entries(updateData).filter(([key, value]) => {
-         // Remove empty strings or undefined values and ensure keys are not empty or only spaces
-         return key.trim() !== "" && value !== undefined && key !== "";
-       })
-     );
+  //  const { db, client } = await connectToDB();
+  //  try {
+  //    // Clean up field names (remove any empty strings, invalid names, or keys with spaces)
+  //    const sanitizedUpdateData = Object.fromEntries(
+  //      Object.entries(updateData).filter(([key, value]) => {
+  //        // Remove empty strings or undefined values and ensure keys are not empty or only spaces
+  //        return key.trim() !== "" && value !== undefined && key !== "";
+  //      })
+  //    );
  
-     console.log("Sanitized Update Data: ", sanitizedUpdateData); // Log sanitized data for debugging
+  //    console.log("Sanitized Update Data: ", sanitizedUpdateData); // Log sanitized data for debugging
  
-    //  if (Object.keys(sanitizedUpdateData).length === 0) {
-    //    console.error("No valid fields to update");
-    //    return res.status(400).json({ message: "No valid fields to update" });
-    //  }
+  //   //  if (Object.keys(sanitizedUpdateData).length === 0) {
+  //   //    console.error("No valid fields to update");
+  //   //    return res.status(400).json({ message: "No valid fields to update" });
+  //   //  }
  
-     const collection = db.collection("Servease_pricing");
+  //    const collection = db.collection("Servease_pricing");
  
-     // Ensure index exists on _id field (optional, only if necessary)
-     await collection.createIndex({ _id: 1 });
+  //    // Ensure index exists on _id field (optional, only if necessary)
+  //    await collection.createIndex({ _id: 1 });
  
-     // Perform the update operation
-     const result = await collection.updateOne(
-       { _id: new ObjectId(recordId) },  // Convert the recordId to ObjectId
-       { $set: sanitizedUpdateData }     // Only include sanitized fields for update
-     );
+  //    // Perform the update operation
+  //    const result = await collection.updateOne(
+  //      { _id: new ObjectId(recordId) },  // Convert the recordId to ObjectId
+  //      { $set: sanitizedUpdateData }     // Only include sanitized fields for update
+  //    );
 
 
-     console.log("result ",result)
+  //    console.log("result ",result)
  
-    //  if (result.modifiedCount > 0) {
-    //    console.log("Record updated successfully!");
-    //    return res.status(200).json({ message: "Record updated successfully!" });
-    //  } else {
-    //    console.log("No document was updated.");
-    //    return res.status(404).json({ message: "No record found to update." });
-    //  }
-   } catch (error) {
-     console.error("Error occurred while updating record:", error);
-     return res.status(500).json({ message: "Internal server error." });
-   } 
-   finally {
-     await client.close();
-   }
+  //   //  if (result.modifiedCount > 0) {
+  //   //    console.log("Record updated successfully!");
+  //   //    return res.status(200).json({ message: "Record updated successfully!" });
+  //   //  } else {
+  //   //    console.log("No document was updated.");
+  //   //    return res.status(404).json({ message: "No record found to update." });
+  //   //  }
+  //  } catch (error) {
+  //    console.error("Error occurred while updating record:", error);
+  //    return res.status(500).json({ message: "Internal server error." });
+  //  } 
+  //  finally {
+  //    await client.close();
+  //  }
  }
  
 
