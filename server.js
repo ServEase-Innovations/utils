@@ -84,9 +84,9 @@ app.put('/records/:id', async (req, res) => {
 
 
   if (result && result.modifiedCount > 0) {
-    return res.status(200).json({ message: 'Record updated successfully' });
+    return result.status(200).json({ message: 'Record updated successfully' });
   } else {
-    return res.status(404).json({ message: 'Record not found or no changes made' });
+    return result.status(404).json({ message: 'Record not found or no changes made' });
   }
 });
 
