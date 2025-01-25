@@ -232,6 +232,8 @@ async function addRecord(newRecord) {
 
 // Update an existing record
 async function updateRecord(recordId, updateData) {
+  console.log("getting updated data ==> ", updateData)
+  console.log("getting record ==> ", recordId)
   const { db, client } = await connectToDB();
   try {
     // Clean up field names (remove any empty strings or invalid names)
