@@ -358,7 +358,7 @@ async function addRecord(newRecord) {
   }
 
   try {
-    const db = await connectToDb();
+    const { db, client } = await connectToDB();
     const collection = db.collection('Servease_pricing'); // Replace with your collection name
 
     const result = await collection.deleteOne({ _id: new ObjectId(id) });
@@ -371,6 +371,8 @@ async function addRecord(newRecord) {
   } catch (error) {
     console.error('Error deleting record:', error);
     return res.status(500).send({ error: 'Internal server error' });
+  } finally {
+    client.close();
   }
 };
  
