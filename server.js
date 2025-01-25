@@ -76,7 +76,7 @@ app.put('/records/:id', async (req, res) => {
   console.error("req => ", req.body)
   console.error("res => ", res)
   
-  const recordId = req.params;
+  const recordId = req;
   const updateData = req.body;
   console.error("recordId => ",recordId)
 

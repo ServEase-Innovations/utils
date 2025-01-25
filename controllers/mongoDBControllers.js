@@ -240,11 +240,8 @@ async function addRecord(newRecord) {
    const recordId = req;  // Get recordId from URL params
    const updateData = req.body;      // Get updateData from request body
  
-   console.log("getting updated data ==> ", updateData);
-   console.log("getting record ==> ", recordId);
- 
    // Validate the recordId format
-   if (!ObjectId.isValid(recordId)) {
+   if (!ObjectId.isValid(updateData)) {
      console.error("Invalid ObjectId format");
      return res.status(400).json({ message: "Invalid ID format" });
    }
