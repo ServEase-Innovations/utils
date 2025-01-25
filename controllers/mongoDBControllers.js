@@ -237,7 +237,7 @@ async function addRecord(newRecord) {
  async function updateRecord(req, res) {
   console.log("Request received:", req);
 
-   const recordId = req.params.id;  // Get recordId from URL params
+   const recordId = req;  // Get recordId from URL params
    const updateData = req.body;      // Get updateData from request body
  
    console.log("getting updated data ==> ", updateData);
