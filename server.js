@@ -13,7 +13,7 @@ const Razorpay = require('razorpay');
 require('dotenv').config();
 
 const app = express();
-const port = 4200;
+const port = 3000;
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
