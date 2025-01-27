@@ -9,12 +9,19 @@ const uploadRoutes = require('./routes/uploadRoutes');
 const { connectToDB } = require('./controllers/mongoDBControllers')
 const multer = require('multer');
 const xlsx = require('xlsx');
+const Razorpay = require('razorpay');
+require('dotenv').config();
 
 const app = express();
-const port = 3000;
+const port = 4200;
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
+
+const razorpay = new Razorpay({
+  key_id: process.env.key_id,
+  key_secret: process.env.key_secret,
+}); 
 
 
 
@@ -72,6 +79,30 @@ app.delete('/records/:id' , deleteRecord)
 app.post('/upload', upload.single('file'), uploadExcel);
 
 app.delete('/delete-all' , deleteAll);
+
+// Endpoint to create an order
+app.post('/create-order', async (req, res) => {
+  try {
+    const { amount } = req.body; // Get amount from the frontend (in paise, e.g., 10000 for ₹100)
+
+    const options = {
+      amount: amount * 100, // Amount in paise
+      currency: 'INR',
+      receipt: `receipt_${new Date().getTime()}`,
+      payment_capture: 1,
+    };
+
+    // Create order
+    const order = await razorpay.orders.create(options);
+    res.json({
+      success: true,
+      orderId: order.id,
+    });
+  } catch (error) {
+    console.error('Error creating Razorpay order:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
