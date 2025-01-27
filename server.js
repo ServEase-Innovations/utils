@@ -19,8 +19,8 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
 const razorpay = new Razorpay({
-  key_id: process.env.key_id,
-  key_secret: process.env.key_secret,
+  key_id: "rzp_test_lTdgjtSRlEwreA",
+  key_secret: "g15WB8CEwaYBQ5FqpIKKMdNS",
 }); 
 
 
