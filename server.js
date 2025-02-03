@@ -3,82 +3,202 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const swaggerUi = require('swagger-ui-express');
 const { swaggerSpec } = require('./docs/swaggerDocs');
-const { getRecords, getRecordById, addRecord, updateRecord } = require('./controllers/mongoDBControllers');
-const emailRoutes = require('./routes/emailRoutes'); // Import email routes
+const { Server } = require('ws');
+const { Client } = require('pg');
 
 const app = express();
 const port = 3000;
 
-// Use CORS middleware (Allow all origins by default)
 app.use(cors());
-
-// Middleware to parse JSON data
 app.use(bodyParser.json());
-
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-
-// Serve static files (for the front-end)
 app.use(express.static('public'));
 
-// Use email routes
-app.use('/send-email', emailRoutes);
-
-app.get('/records', async (req, res) => {
-  const records = await getRecords();
-  res.json(records);
-});
-
-app.post('/records', async (req, res) => {
-  const recordData = req.body;
-
-  // Input validation
-  if (!recordData || !recordData.name || !recordData.price || !recordData.description) {
-    return res.status(400).json({ message: 'Invalid data provided. Name, price, and description are required.' });
-  }
-
-  try {
-    const result = await addRecord(recordData);
-    res.status(201).json({ message: 'Record added successfully', result });
-  } catch (error) {
-    console.error('Error adding record:', error);
-    res.status(500).json({ message: 'Internal Server Error' });
-  }
-});
-
-app.get('/records/:id', async (req, res) => {
-  const recordId = req.params.id;
-
-  if (!ObjectId.isValid(recordId)) {
-    return res.status(400).json({ message: 'Invalid ID format' });
-  }
-
-  const record = await getRecordById(recordId);
-
-  if (record) {
-    return res.status(200).json(record);
-  } else {
-    return res.status(404).json({ message: 'Record not found' });
-  }
-});
-
-app.put('/records/:id', async (req, res) => {
-  const recordId = req.params.id;
-  const updateData = req.body;
-
-  if (!updateData || Object.keys(updateData).length === 0) {
-    return res.status(400).json({ message: 'Invalid data provided. At least one field must be updated.' });
-  }
-
-  const result = await updateRecord(recordId, updateData);
-
-  if (result && result.modifiedCount > 0) {
-    return res.status(200).json({ message: 'Record updated successfully' });
-  } else {
-    return res.status(404).json({ message: 'Record not found or no changes made' });
-  }
-});
-
-
-app.listen(port, () => {
+// WebSocket server
+const server = app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
 });
+
+const wss = new Server({ server });
+const connectedNumbers = new Map();
+wss.on('connection', (ws) => {
+  console.log('WebSocket client connected');
+
+  ws.on('message', (message) => {
+    const number = message.toString().trim(); 
+    console.log('Received number:', number);
+
+    if (number) {
+      connectedNumbers.set(number, ws); 
+      console.log('Connected numbers:', Array.from(connectedNumbers.keys()));
+    }
+  });
+
+  ws.on('close', () => {
+    for (const [key, client] of connectedNumbers.entries()) {
+      if (client === ws) {
+        connectedNumbers.delete(key);
+        break;
+      }
+    }
+    console.log('WebSocket client disconnected');
+  });
+});
+
+// PostgreSQL client
+const pgClient = new Client({
+  connectionString: 'postgresql://servease.c1ccc8a0u3nt.ap-south-1.rds.amazonaws.com:5432/provider?user=postgres&password=servease',
+});
+pgClient.connect();
+
+pgClient.query('LISTEN engagement_insert');
+
+pgClient.on('notification', (msg) => {
+  console.log('Notification received:', msg.payload);
+
+  const payload = JSON.parse(msg.payload); 
+  const serviceProviderId = payload.serviceproviderid.toString();
+
+  if (connectedNumbers.has(serviceProviderId)) {
+    const client = connectedNumbers.get(serviceProviderId);
+    if (client && client.readyState === WebSocket.OPEN) {
+      client.send(`New data inserted for ServiceProviderID: ${serviceProviderId}`);
+    }
+  } else {
+    console.log(`No connected client for ServiceProviderID: ${serviceProviderId}`);
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// const express = require('express');
+// const cors = require('cors');
+// const bodyParser = require('body-parser');
+// const swaggerUi = require('swagger-ui-express');
+// const { swaggerSpec } = require('./docs/swaggerDocs');
+// const { getRecords, getRecordById, addRecord, updateRecord } = require('./controllers/mongoDBControllers');
+// const emailRoutes = require('./routes/emailRoutes'); // Import email routes
+// const { Server } = require('ws'); // Import WebSocket server
+// const { Client } = require('pg'); // PostgreSQL client for notifications
+
+// const app = express();
+// const port = 3000;
+
+// // Use CORS middleware (Allow all origins by default)
+// app.use(cors());
+
+// // Middleware to parse JSON data
+// app.use(bodyParser.json());
+
+// app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// // Serve static files (for the front-end)
+// app.use(express.static('public'));
+
+// // Use email routes
+// app.use('/send-email', emailRoutes);
+
+// app.get('/records', async (req, res) => {
+//   const records = await getRecords();
+//   res.json(records);
+// });
+
+// app.post('/records', async (req, res) => {
+//   const recordData = req.body;
+
+//   // Input validation
+//   if (!recordData || !recordData.name || !recordData.price || !recordData.description) {
+//     return res.status(400).json({ message: 'Invalid data provided. Name, price, and description are required.' });
+//   }
+
+//   try {
+//     const result = await addRecord(recordData);
+//     res.status(201).json({ message: 'Record added successfully', result });
+//   } catch (error) {
+//     console.error('Error adding record:', error);
+//     res.status(500).json({ message: 'Internal Server Error' });
+//   }
+// });
+
+// app.get('/records/:id', async (req, res) => {
+//   const recordId = req.params.id;
+
+//   if (!ObjectId.isValid(recordId)) {
+//     return res.status(400).json({ message: 'Invalid ID format' });
+//   }
+
+//   const record = await getRecordById(recordId);
+
+//   if (record) {
+//     return res.status(200).json(record);
+//   } else {
+//     return res.status(404).json({ message: 'Record not found' });
+//   }
+// });
+
+// app.put('/records/:id', async (req, res) => {
+//   const recordId = req.params.id;
+//   const updateData = req.body;
+
+//   if (!updateData || Object.keys(updateData).length === 0) {
+//     return res.status(400).json({ message: 'Invalid data provided. At least one field must be updated.' });
+//   }
+
+//   const result = await updateRecord(recordId, updateData);
+
+//   if (result && result.modifiedCount > 0) {
+//     return res.status(200).json({ message: 'Record updated successfully' });
+//   } else {
+//     return res.status(404).json({ message: 'Record not found or no changes made' });
+//   }
+// });
+
+// // WebSocket server
+// const server = app.listen(port, () => {
+//   console.log(`Server is running on http://localhost:${port}`);
+// });
+
+// const wss = new Server({ server });
+
+// wss.on('connection', (ws) => {
+//   console.log('WebSocket client connected');
+
+//   ws.on('message', (message) => {
+//     console.log(`${message} is connected`);
+//   });
+
+//   ws.on('close', () => {
+//     console.log('WebSocket client disconnected');
+//   });
+// });
+
+// // PostgreSQL
+// const pgClient = new Client({
+//   connectionString: 'postgresql://servease.c1ccc8a0u3nt.ap-south-1.rds.amazonaws.com:5432/provider?user=postgres&password=servease',
+// });
+// pgClient.connect();
+
+// //to listen for notifications from db
+// pgClient.query('LISTEN engagement_insert');
+
+// pgClient.on('notification', (msg) => {
+//   console.log('Notification received:', msg.payload);
+//   wss.clients.forEach((client) => {
+//     if (client.readyState === WebSocket.OPEN) {
+//       client.send('New data inserted'); 
+//     }
+//   });
+// });

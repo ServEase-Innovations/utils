@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Notification</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+
+        #notification {
+            margin: 20px auto;
+            padding: 10px;
+            max-width: 500px;
+            text-align: center;
+            border: 1px solid #dd4141;
+            border-radius: 5px;
+            background-color: #a3e8a3;
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="notification">New data inserted!</div>
+    <div>
+        <input type="text" id="numberInput" placeholder="Enter a number" />
+        <button id="sendButton">Send</button>
+    </div>
+    <script>
+        const socket = new WebSocket('ws://localhost:3000');
+        const notificationDiv = document.getElementById('notification');
+        const sendButton = document.getElementById('sendButton');
+        const numberInput = document.getElementById('numberInput');
+
+        socket.onmessage = (event) => {
+            notificationDiv.textContent = event.data;
+            notificationDiv.style.display = 'block';
+            setTimeout(() => {
+                notificationDiv.style.display = 'none';
+            }, 5000);
+        };
+
+        socket.onopen = () => console.log('Connected to WebSocket server');
+        socket.onclose = () => console.log('Disconnected from WebSocket server');
+        socket.onerror = (error) => console.error('WebSocket error:', error);
+
+        sendButton.addEventListener('click', () => {
+            const number = numberInput.value.trim();
+            if (number) {
+                socket.send(number);
+                console.log('Sent to server:', number);
+                numberInput.value = '';
+            } else {
+                alert('Please enter a valid number.');
+            }
+        });
+    </script>
+</body>
+
+</html>
