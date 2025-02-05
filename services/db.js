@@ -2,7 +2,6 @@
 const { Pool } = require('pg');
 const { Client } = require('pg');  // Import the Client to listen to notifications
 require('dotenv').config();
-require('dotenv').config();
 const socketIo = require('socket.io'); 
 
 
