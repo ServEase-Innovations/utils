@@ -5,19 +5,21 @@ const swaggerUi = require('swagger-ui-express');
 const { swaggerSpec } = require('./docs/swaggerDocs');
 const { Server } = require('ws');
 const { Client } = require('pg');
-const bookingEmailRoutes = require('./routes/bookingRoutes');
 const { getRecords, getRecordById, addRecord, updateRecord, uploadExcel, deleteAll, deleteRecord } = require('./controllers/mongoDBControllers');
 const emailRoutes = require('./routes/emailRoutes');
+const bookemailRoutes = require('./routes/bookingemailRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const { connectToDB } = require('./controllers/mongoDBControllers');
 const multer = require('multer');
 const xlsx = require('xlsx');
 const Razorpay = require('razorpay');
-const http = require('http'); // ✅ Import the http module
+const http = require('http'); 
 require('dotenv').config();
 
 const app = express();
+const appForEmail = express();
 const port = 3000;
+const emailPort = 4000;
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
@@ -30,12 +32,11 @@ const razorpay = new Razorpay({
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+app.use(express.json());
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
-app.use('/api/bookings', bookingEmailRoutes);
 app.use('/send-email', emailRoutes);
-
 app.get('/records', async (req, res) => {
   const records = await getRecords();
   res.json(records);
@@ -66,6 +67,18 @@ app.get('/records/:id', async (req, res) => {
   }
 });
 
+app.post('/send-booking-email', async (req, res) => {
+  try {
+    // Call to send the booking email
+    await sendBookingEmail(req.body.email, req.body.userName, req.body.serviceType, req.body.spName, req.body.dateTime, req.body.confirmCode, req.body.phoneNumber);
+    res.status(200).send('Email sent successfully');
+  } catch (error) {
+    console.error('Error sending email:', error);
+    res.status(500).send({ error: 'Failed to send email' });
+  }
+});
+
+
 app.put('/records/:id', updateRecord);
 app.delete('/records/:id', deleteRecord);
 app.post('/upload', upload.single('file'), uploadExcel);
@@ -78,12 +91,26 @@ server.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
 });
 
+// Middleware for the email app (port 4000)
+appForEmail.use(cors());
+appForEmail.use(bodyParser.json());
+appForEmail.use(express.json());
+appForEmail.use(express.urlencoded({ extended: true }));
+appForEmail.use(express.static('views'));
+appForEmail.use('/send-booking-email', bookemailRoutes); 
+
+// Start the email server (port 4000)
+const emailServer = http.createServer(appForEmail);
+emailServer.listen(emailPort, () => {
+  console.log(`Email server is running on http://localhost:${emailPort}`);
+});
+
 // ✅ WebSocket server now correctly uses the HTTP server
 const wss = new Server({ server });
 const connectedNumbers = new Map();
 
 wss.on('connection', (ws) => {
-  console.log('WebSocket client connected');
+  //console.log('WebSocket client connected');
 
   ws.on('message', (message) => {
     const number = message.toString().trim();
@@ -101,7 +128,7 @@ wss.on('connection', (ws) => {
         break;
       }
     }
-    console.log('WebSocket client disconnected');
+    //console.log('WebSocket client disconnected');
   });
 });
 
