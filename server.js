@@ -5,6 +5,7 @@ const swaggerUi = require('swagger-ui-express');
 const { swaggerSpec } = require('./docs/swaggerDocs');
 const { Server } = require('ws');
 const { Client } = require('pg');
+const bookingEmailRoutes = require('./routes/bookingRoutes');
 
 const app = express();
 const port = 3000;
@@ -13,6 +14,7 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use(express.static('public'));
+app.use('/api/bookings', bookingEmailRoutes); 
 
 // WebSocket server
 const server = app.listen(port, () => {
