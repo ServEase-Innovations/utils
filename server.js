@@ -8,6 +8,8 @@ const { Client } = require('pg');
 const { getRecords, getRecordById, addRecord, updateRecord, uploadExcel, deleteAll, deleteRecord } = require('./controllers/mongoDBControllers');
 const emailRoutes = require('./routes/emailRoutes');
 const bookemailRoutes = require('./routes/bookingemailRoutes');
+const rescheduleEmailRoutes = require('./routes/rescheduleEmailRoutes');
+const cancelEmailRoutes = require('./routes/cancelEmailRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const { connectToDB } = require('./controllers/mongoDBControllers');
 const multer = require('multer');
@@ -67,18 +69,6 @@ app.get('/records/:id', async (req, res) => {
   }
 });
 
-app.post('/send-booking-email', async (req, res) => {
-  try {
-    // Call to send the booking email
-    await sendBookingEmail(req.body.email, req.body.userName, req.body.serviceType, req.body.spName, req.body.dateTime, req.body.confirmCode, req.body.phoneNumber);
-    res.status(200).send('Email sent successfully');
-  } catch (error) {
-    console.error('Error sending email:', error);
-    res.status(500).send({ error: 'Failed to send email' });
-  }
-});
-
-
 app.put('/records/:id', updateRecord);
 app.delete('/records/:id', deleteRecord);
 app.post('/upload', upload.single('file'), uploadExcel);
@@ -97,6 +87,8 @@ appForEmail.use(bodyParser.json());
 appForEmail.use(express.json());
 appForEmail.use(express.urlencoded({ extended: true }));
 appForEmail.use(express.static('views'));
+appForEmail.use('/send-cancel-email', cancelEmailRoutes);
+appForEmail.use('/send-reschedule-email', rescheduleEmailRoutes);
 appForEmail.use('/send-booking-email', bookemailRoutes); 
 
 // Start the email server (port 4000)
