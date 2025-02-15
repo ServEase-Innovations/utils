@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cancel Appointment</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 20px auto;
+            background: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+        }
+
+        input,
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #0683f9;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #0268c8;
+        }
+
+        @media only screen and (max-width: 600px) {
+            .container {
+                width: 95%;
+                margin: 10px auto;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>Cancel Appointment</h2>
+        <form id="cancelForm" action="/send-cancel-email" method="POST">
+            <label>Email:</label>
+            <input type="email" id="email" required>
+
+            <label>User's First Name:</label>
+            <input type="text" id="userName" required>
+
+            <label>Service Type:</label>
+            <input type="text" id="serviceType" required>
+
+            <label>Service Provider Name:</label>
+            <input type="text" id="spName" required>
+
+            <label>Date and Time:</label>
+            <input type="text" id="dateTime" required>
+
+            <label>Phone Number:</label>
+            <input type="text" id="phoneNumber" required>
+
+            <button type="submit">Cancel Appointment</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('cancelForm').addEventListener('submit', async function (event) {
+            event.preventDefault();
+
+            const emailData = {
+                email: document.getElementById('email').value,
+                userName: document.getElementById('userName').value,
+                serviceType: document.getElementById('serviceType').value,
+                spName: document.getElementById('spName').value,
+                dateTime: document.getElementById('dateTime').value,
+                phoneNumber: document.getElementById('phoneNumber').value
+            };
+
+            try {
+                const response = await fetch('/send-cancel-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(emailData)
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    alert('Cancellation email sent successfully!');
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error sending cancellation email');
+            }
+        });
+    </script>
+
+</body>
+
+</html>

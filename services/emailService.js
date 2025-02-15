@@ -1,5 +1,5 @@
 const { SESClient, SendEmailCommand } = require('@aws-sdk/client-ses');
-const { SES_REGION, SENDER_EMAIL } = require('../config/emailConfig'); // Import configuration
+const { SES_REGION, SENDER_EMAIL } = require('../config/emailConfig'); 
 
 // Configure AWS SES v3 client
 const sesClient = new SESClient({

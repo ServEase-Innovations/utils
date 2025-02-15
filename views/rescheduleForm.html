@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reschedule Appointment</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+
+        input,
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            background-color: #0288d1;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0268c8;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h2>Reschedule Appointment</h2>
+        <form id="rescheduleForm" action="/send-reschedule-email" method="POST"> <label>Email:</label>
+            <input type="email" id="email" required>
+
+            <label>User's First Name:</label>
+            <input type="text" id="userName" required>
+
+            <label>Service Type:</label>
+            <input type="text" id="serviceType" required>
+
+            <label>Service Provider Name:</label>
+            <input type="text" id="spName" required>
+
+            <label>New Date and Time:</label>
+            <input type="text" id="dateTime" required>
+
+            <label>Confirmation Code:</label>
+            <input type="text" id="confirmCode" required>
+
+            <label>Phone Number:</label>
+            <input type="text" id="phoneNumber" required>
+
+            <button type="submit">Reschedule</button>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById('rescheduleForm').addEventListener('submit', async function (event) {
+            event.preventDefault();
+
+            const emailData = {
+                email: document.getElementById('email').value,
+                userName: document.getElementById('userName').value,
+                serviceType: document.getElementById('serviceType').value,
+                spName: document.getElementById('spName').value,
+                dateTime: document.getElementById('dateTime').value,
+                confirmCode: document.getElementById('confirmCode').value,
+                phoneNumber: document.getElementById('phoneNumber').value
+            };
+
+            try {
+                const response = await fetch('/send-reschedule-email', { 
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(emailData)
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    alert('Reschedule email sent successfully!'); 
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Error sending reschedule email');
+            }
+        });
+    </script>
+
+</body>
+
+</html>
