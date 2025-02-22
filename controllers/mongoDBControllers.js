@@ -3,7 +3,7 @@ const fs = require('fs');
 const xlsx = require('xlsx');
 const { ObjectId } = require('mongodb');  // Ensure ObjectId is imported
 
-const uri = "mongodb://servease:servease@docdb-2025-01-12-14-21-33.c1ccc8a0u3nt.ap-south-1.docdb.amazonaws.com:27017,docdb-2025-01-12-14-21-332.c1ccc8a0u3nt.ap-south-1.docdb.amazonaws.com:27017,docdb-2025-01-12-14-21-333.c1ccc8a0u3nt.ap-south-1.docdb.amazonaws.com:27017/?tls=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false"; // Replace with your MongoDB URI
+const uri = "mongodb://13.127.47.159:27017"; // Replace with your MongoDB URI
 const sslCA = fs.readFileSync('./global-bundle.p7b'); // Path to the CA file
 
 
@@ -233,7 +233,7 @@ const deleteAll = async (req, res) => {
 async function connectToDB() {
   const client = new MongoClient(uri, {
     useUnifiedTopology: true,
-    tls: true,
+    tls: false,
     tlsCAFile: './../global-bundle.pem',
   });
   await client.connect();
