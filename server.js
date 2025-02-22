@@ -97,13 +97,14 @@ emailServer.listen(emailPort, () => {
   console.log(`Email server is running on http://localhost:${emailPort}`);
 });
 
+
+
 // ✅ WebSocket server now correctly uses the HTTP server
 const wss = new Server({ server });
 const connectedNumbers = new Map();
 
 wss.on('connection', (ws) => {
-  //console.log('WebSocket client connected');
-
+  // Handle incoming messages from the WebSocket client
   ws.on('message', (message) => {
     const number = message.toString().trim();
     console.log('Received number:', number);
@@ -113,14 +114,25 @@ wss.on('connection', (ws) => {
     }
   });
 
+  // Handle WebSocket client closure without crashing the app
   ws.on('close', () => {
-    for (const [key, client] of connectedNumbers.entries()) {
-      if (client === ws) {
-        connectedNumbers.delete(key);
-        break;
+    try {
+      // Try to remove the client from connectedNumbers map
+      for (const [key, client] of connectedNumbers.entries()) {
+        if (client === ws) {
+          connectedNumbers.delete(key);
+          console.log(`WebSocket client disconnected for number: ${key}`);
+          break;
+        }
       }
+    } catch (error) {
+      console.error('Error during client disconnection:', error);
     }
-    //console.log('WebSocket client disconnected');
+  });
+
+  // Handle WebSocket errors gracefully
+  ws.on('error', (err) => {
+    console.error('WebSocket error:', err);
   });
 });
 
@@ -128,22 +140,40 @@ wss.on('connection', (ws) => {
 const pgClient = new Client({
   connectionString: 'postgresql://servease.c1ccc8a0u3nt.ap-south-1.rds.amazonaws.com:5432/provider?user=postgres&password=servease',
 });
+
 pgClient.connect();
 
+// Listen for notifications on PostgreSQL
 pgClient.query('LISTEN engagement_insert');
 
+// Handle PostgreSQL notifications
 pgClient.on('notification', (msg) => {
-  console.log('Notification received:', msg.payload);
+  try {
+    console.log('Notification received:', msg.payload);
 
-  const payload = JSON.parse(msg.payload);
-  const serviceProviderId = payload.serviceproviderid.toString();
+    const payload = JSON.parse(msg.payload);
+    const serviceProviderId = payload.serviceproviderid.toString();
 
-  if (connectedNumbers.has(serviceProviderId)) {
-    const client = connectedNumbers.get(serviceProviderId);
-    if (client && client.readyState === WebSocket.OPEN) {
-      client.send(`New data inserted for ServiceProviderID: ${serviceProviderId}`);
+    // Check if there's an active WebSocket connection for the serviceProviderId
+    if (connectedNumbers.has(serviceProviderId)) {
+      const client = connectedNumbers.get(serviceProviderId);
+      if (client && client.readyState === WebSocket.OPEN) {
+        client.send(`New data inserted for ServiceProviderID: ${serviceProviderId}`);
+      }
+    } else {
+      console.log(`No connected client for ServiceProviderID: ${serviceProviderId}`);
     }
-  } else {
-    console.log(`No connected client for ServiceProviderID: ${serviceProviderId}`);
+  } catch (error) {
+    console.error('Error processing notification:', error);
   }
 });
+
+pgClient.on('error', (error) => {
+  console.error('PostgreSQL client error:', error);
+});
+
+// Handle any uncaught exceptions in the application
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err);
+});
+
