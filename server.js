@@ -20,7 +20,7 @@ require('dotenv').config();
 
 const app = express();
 const appForEmail = express();
-const port = 5000;
+const port = 3000;
 const emailPort = 4000;
 
 const storage = multer.memoryStorage();
