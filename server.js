@@ -20,7 +20,7 @@ require('dotenv').config();
 
 const app = express();
 const appForEmail = express();
-const port = 3000;
+const port = 5000;
 const emailPort = 4000;
 
 const storage = multer.memoryStorage();
@@ -90,6 +90,30 @@ appForEmail.use(express.static('views'));
 appForEmail.use('/send-cancel-email', cancelEmailRoutes);
 appForEmail.use('/send-reschedule-email', rescheduleEmailRoutes);
 appForEmail.use('/send-booking-email', bookemailRoutes); 
+
+// Endpoint to create an order
+app.post('/create-order', async (req, res) => {
+  try {
+    const { amount } = req.body; // Get amount from the frontend (in paise, e.g., 10000 for ₹100)
+
+    const options = {
+      amount: amount * 100, // Amount in paise
+      currency: 'INR',
+      receipt: `receipt_${new Date().getTime()}`,
+      payment_capture: 1,
+    };
+
+    // Create order
+    const order = await razorpay.orders.create(options);
+    res.json({
+      success: true,
+      orderId: order.id,
+    });
+  } catch (error) {
+    console.error('Error creating Razorpay order:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 
 // Start the email server (port 4000)
 const emailServer = http.createServer(appForEmail);
