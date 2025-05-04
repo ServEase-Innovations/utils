@@ -162,7 +162,7 @@ wss.on('connection', (ws) => {
 
 // ✅ PostgreSQL client
 const pgClient = new Client({
-  connectionString: 'postgresql://servease.c1ccc8a0u3nt.ap-south-1.rds.amazonaws.com:5432/provider?user=postgres&password=servease',
+  connectionString: 'postgresql://13.203.193.7:5432/postgres?user=postgres&password=serveaso',
 });
 
 pgClient.connect();

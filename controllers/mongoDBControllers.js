@@ -3,7 +3,7 @@ const fs = require('fs');
 const xlsx = require('xlsx');
 const { ObjectId } = require('mongodb');  // Ensure ObjectId is imported
 
-const uri = "mongodb://13.127.47.159:27017"; // Replace with your MongoDB URI
+const uri = "mongodb://13.235.76.56:27017"; // Replace with your MongoDB URI
 const sslCA = fs.readFileSync('./global-bundle.p7b'); // Path to the CA file
 
 
