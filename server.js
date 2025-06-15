@@ -5,7 +5,7 @@ const swaggerUi = require('swagger-ui-express');
 const { swaggerSpec } = require('./docs/swaggerDocs');
 const { Server } = require('ws');
 const { Client } = require('pg');
-const { getRecords, getRecordById, addRecord, updateRecord, uploadExcel, deleteAll, deleteRecord } = require('./controllers/mongoDBControllers');
+const { getRecords, getRecordById, addRecord, updateRecord, uploadExcel, deleteAll, deleteRecord , getUserSettingsRecords , getUserSettingsById , addSettings , deleteUserPreferenceRecord ,updateUserSettings , deleteUserSettings , deleteAlUserPreference } = require('./controllers/mongoDBControllers');
 const emailRoutes = require('./routes/emailRoutes');
 const bookemailRoutes = require('./routes/bookingemailRoutes');
 const rescheduleEmailRoutes = require('./routes/rescheduleEmailRoutes');
@@ -44,6 +44,25 @@ app.get('/records', async (req, res) => {
   res.json(records);
 });
 
+app.get('/user-settings', async (req, res) => {
+  const records = await getUserSettingsRecords();
+  res.json(records);
+});
+
+app.get('/user-preferences/:id', async (req, res) => {
+  const recordId = req.params.id;
+  if (!ObjectId.isValid(recordId)) {
+    return res.status(400).json({ message: 'Invalid ID format' });
+  }
+
+  const record = await getUserSettingsById(recordId);
+  if (record) {
+    return res.status(200).json(record);
+  } else {
+    return res.status(404).json({ message: 'Record not found' });
+  }
+});
+
 app.post('/records', async (req, res) => {
   const recordData = req.body;
   try {
@@ -54,6 +73,22 @@ app.post('/records', async (req, res) => {
     res.status(500).json({ message: 'Internal Server Error' });
   }
 });
+
+app.post('/user-settings', async (req, res) => {
+  const recordData = req.body;
+  try {
+    const result = await addSettings(recordData);
+    res.status(201).json({ message: 'Record added successfully', result });
+  } catch (error) {
+    console.error('Error adding record:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+
+app.put('/user-settings/:id', updateUserSettings);
+app.delete('/user-settings/:id', deleteUserSettings);
+app.delete('/user-settings/delete-all', deleteAlUserPreference);
 
 app.get('/records/:id', async (req, res) => {
   const recordId = req.params.id;
@@ -68,6 +103,7 @@ app.get('/records/:id', async (req, res) => {
     return res.status(404).json({ message: 'Record not found' });
   }
 });
+
 
 app.put('/records/:id', updateRecord);
 app.delete('/records/:id', deleteRecord);
