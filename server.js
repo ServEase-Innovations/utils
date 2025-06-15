@@ -17,6 +17,7 @@ const xlsx = require('xlsx');
 const Razorpay = require('razorpay');
 const http = require('http'); 
 require('dotenv').config();
+const { ObjectId } = require('mongodb');
 
 const app = express();
 const appForEmail = express();
@@ -49,12 +50,9 @@ app.get('/user-settings', async (req, res) => {
   res.json(records);
 });
 
-app.get('/user-preferences/:id', async (req, res) => {
-  const recordId = req.params.id;
-  if (!ObjectId.isValid(recordId)) {
-    return res.status(400).json({ message: 'Invalid ID format' });
-  }
+app.get('/user-settings/:id', async (req, res) => {
 
+  const recordId = req.params.id;
   const record = await getUserSettingsById(recordId);
   if (record) {
     return res.status(200).json(record);

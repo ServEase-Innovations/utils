@@ -269,7 +269,7 @@ const sslCA = fs.readFileSync('./global-bundle.p7b'); // Path to the CA file
  * /user-settings/{id}:
  *   get:
  *     tags:
- *       - pricing
+ *       - user-settings
  *     summary: Get a record by its ID
  *     parameters:
  *       - in: path
@@ -598,20 +598,28 @@ const deleteAlUserPreference = async (req, res) => {
 };
 
 
-async function getUserSettingsById(recordId) {
-  
+async function getUserSettingsById(userId) {
+  console.log("Fetching user settings for userId:", userId);
   const { db, client } = await connectToDBUserPreference();
   try {
     const collection = db.collection("settings");
-    const record = await collection.findOne({ _id: new ObjectId(recordId) });
-    return record;
+
+    const records = await collection.find({ userId: parseInt(userId) }).toArray();
+
+    if (records.length === 0) {
+      console.log("No records found for userId:", userId);
+      return null;
+    }
+
+    return records;
   } catch (error) {
-    console.error("Error occurred while fetching record:", error);
+    console.error("Error occurred while fetching records:", error);
     return null;
   } finally {
     await client.close();
   }
 }
+
 
 async function addSettings(newRecord) {
   const { db, client } = await connectToDBUserPreference();
