@@ -296,8 +296,6 @@ const sslCA = fs.readFileSync('./global-bundle.p7b'); // Path to the CA file
  *                   type: string
  *       400:
  *         description: Invalid ID format
- *       404:
- *         description: Record not found
  *   put:
  *     tags:
  *       - user-settings
@@ -598,16 +596,16 @@ const deleteAlUserPreference = async (req, res) => {
 };
 
 
-async function getUserSettingsById(userId) {
-  console.log("Fetching user settings for userId:", userId);
+async function getUserSettingsById(customerId) {
+  console.log("Fetching user settings for userId:", customerId);
   const { db, client } = await connectToDBUserPreference();
   try {
     const collection = db.collection("settings");
 
-    const records = await collection.find({ userId: parseInt(userId) }).toArray();
+    const records = await collection.find({ customerId: parseInt(customerId) }).toArray();
 
     if (records.length === 0) {
-      console.log("No records found for userId:", userId);
+      console.log("No records found for userId:", customerId);
       return null;
     }
 
