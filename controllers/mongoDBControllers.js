@@ -634,16 +634,14 @@ async function addSettings(newRecord) {
 }
 
 async function updateUserSettings(req, res) {
-
-  const recordId = req.params?.id;  // Get recordId from URL params
-  const updateData = req.body;      // Get updateData from request body
+  const customerId = parseInt(req.params?.id, 10);  // Get customerId from URL and ensure it's a number
+  const updateData = req.body;
 
   const { db, client } = await connectToDBUserPreference();
   try {
-    // Clean up field names (remove any empty strings, invalid names, or keys with spaces)
+    // Clean up field names
     const sanitizedUpdateData = Object.fromEntries(
       Object.entries(updateData).filter(([key, value]) => {
-        // Remove empty strings or undefined values and ensure keys are not empty or only spaces
         return key.trim() !== "" && value !== undefined && key !== "";
       })
     );
@@ -655,17 +653,12 @@ async function updateUserSettings(req, res) {
 
     const collection = db.collection("settings");
 
-    // Ensure index exists on _id field (optional, only if necessary)
-    await collection.createIndex({ _id: 1 });
-
-    // Perform the update operation
     const result = await collection.updateOne(
-      { _id: new ObjectId(recordId) },  // Convert the recordId to ObjectId
-      { $set: sanitizedUpdateData }     // Only include sanitized fields for update
+      { customerId: customerId },               // Use customerId for matching
+      { $set: sanitizedUpdateData }
     );
 
-
-    console.log("result ",result)
+    console.log("result ", result);
 
     if (result.modifiedCount > 0) {
       console.log("Record updated successfully!");
@@ -677,11 +670,11 @@ async function updateUserSettings(req, res) {
   } catch (error) {
     console.error("Error occurred while updating record:", error);
     return res.status(500).json({ message: "Internal server error." });
-  } 
-  finally {
+  } finally {
     await client.close();
   }
 }
+
 
 async function deleteUserSettings (req, res) {
   const { id } = req.params;
