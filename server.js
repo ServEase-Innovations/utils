@@ -18,6 +18,8 @@ const Razorpay = require('razorpay');
 const http = require('http'); 
 require('dotenv').config();
 const { ObjectId } = require('mongodb');
+const { expressjwt: jwt } = require('express-jwt');
+const jwksRsa = require('jwks-rsa');
 
 const app = express();
 const appForEmail = express();
@@ -26,6 +28,26 @@ const emailPort = 4000;
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
+
+const checkJwt = jwt({
+  secret: jwksRsa.expressJwtSecret({
+    cache: true,
+    rateLimit: true,
+    jwksUri: `https://${process.env.AUTH0_DOMAIN}/.well-known/jwks.json`,
+  }),
+  audience: process.env.AUTH0_AUDIENCE,
+  issuer: `https://${process.env.AUTH0_DOMAIN}/`,
+  algorithms: ['RS256'],
+});
+
+app.get('/api/public', (req, res) => {
+  res.json({ message: 'Hello from a public endpoint!' });
+});
+
+// Protected route
+app.get('/api/protected', checkJwt, (req, res) => {
+  res.json({ message: 'Hello from a protected endpoint!', user: req.auth });
+});
 
 const razorpay = new Razorpay({
   key_id: "rzp_test_lTdgjtSRlEwreA",
