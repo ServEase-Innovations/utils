@@ -363,7 +363,31 @@ const sslCA = fs.readFileSync('./global-bundle.p7b'); // Path to the CA file
  *       500:
  *         description: Internal server error
  */
-
+/**
+ * @swagger
+ * /customer/check-email:
+ *   get:
+ *     tags:
+ *       - Customer-Management
+ *     summary: Check if an email exists in the customer table
+ *     parameters:
+ *       - in: query
+ *         name: email
+ *         schema:
+ *           type: string
+ *         required: true
+ *         description: Email ID to check
+ *     responses:
+ *       200:
+ *         description: Email existence result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 exists:
+ *                   type: boolean
+ */
 
 
 
@@ -727,6 +751,7 @@ async function deleteUserPreferenceRecord (req, res) {
     client.close();
   }
 };
+
  
 
 
