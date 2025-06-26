@@ -218,7 +218,11 @@ wss.on('connection', (ws) => {
 
 // ✅ PostgreSQL client
 const pgClient = new Client({
-  connectionString: 'postgresql://13.203.193.7:5432/postgres?user=postgres&password=serveaso',
+  host: "13.203.193.7",
+  port: 5432,
+  database: "postgres",
+  user: "postgres",
+  password: "serveaso",
 });
 
 pgClient.connect();
@@ -250,6 +254,25 @@ pgClient.on('notification', (msg) => {
 
 pgClient.on('error', (error) => {
   console.error('PostgreSQL client error:', error);
+});
+
+app.get("/customer/check-email", async (req, res) => {
+  const { email } = req.query;
+
+  if (!email) {
+    return res.status(400).json({ error: "Email query parameter is required" });
+  }
+
+  try {
+    const result = await pgClient.query(
+      "SELECT 1 FROM customer WHERE emailid = $1 LIMIT 1",
+      [email]
+    );
+    res.json({ exists: result.rowCount > 0 });
+  } catch (err) {
+    console.error("❌ Error checking customer email:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
 
 // Handle any uncaught exceptions in the application
