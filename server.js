@@ -264,16 +264,52 @@ app.get("/customer/check-email", async (req, res) => {
   }
 
   try {
-    const result = await pgClient.query(
-      "SELECT 1 FROM customer WHERE emailid = $1 LIMIT 1",
+    // Step 1: Check if user exists and get their role
+    const userResult = await pgClient.query(
+      "SELECT user_role FROM user_credentials WHERE username = $1 LIMIT 1",
       [email]
     );
-    res.json({ exists: result.rowCount > 0 });
+
+    if (userResult.rowCount === 0) {
+      return res.json({ exists: false });
+    }
+
+    const userRole = userResult.rows[0].user_role;
+
+    let idResult;
+    if (userRole === "CUSTOMER") {
+      // Step 2a: Get ID from customer table
+      idResult = await pgClient.query(
+        "SELECT customerid AS id FROM customer WHERE emailid = $1 LIMIT 1",
+        [email]
+      );
+    } else if (userRole === "SERVICE_PROVIDER") {
+      idResult = await pgClient.query(
+        "SELECT serviceproviderid AS id FROM serviceprovider WHERE emailid = $1 LIMIT 1",
+        [email]
+      )
+    } else {
+      return res.status(400).json({ error: "Unknown user role" });
+    }
+
+    if (idResult.rowCount === 0) {
+      return res.status(404).json({ error: "User record not found in role-specific table" });
+    }
+
+    const userId = idResult.rows[0].id;
+
+    // Step 3: Respond with combined data
+    return res.json({
+      id: userId,
+      user_role: userRole,
+    });
+
   } catch (err) {
     console.error("❌ Error checking customer email:", err);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
 
 // Handle any uncaught exceptions in the application
 process.on('uncaughtException', (err) => {
