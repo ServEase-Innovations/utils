@@ -223,6 +223,9 @@ const pgClient = new Client({
   database: "postgres",
   user: "postgres",
   password: "serveaso",
+  max: 10, // max connections
+  idleTimeoutMillis: 30000, // close idle clients after 30s
+  connectionTimeoutMillis: 2000,
 });
 
 pgClient.connect();
