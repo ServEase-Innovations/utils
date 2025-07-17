@@ -1,6 +1,6 @@
 const { MongoClient } = require('mongodb');
 
-const uri = "mongodb://13.127.47.159:27017"; // Replace with your EC2's public IP address
+const uri = "mongodb://serveaso:serveaso@43.204.100.109:27017/?authSource=admin"; // Replace with your EC2's public IP address
 
 async function connectMongo() {
   const client = new MongoClient(uri);
