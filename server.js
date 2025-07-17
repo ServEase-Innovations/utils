@@ -262,10 +262,10 @@ const pgClient = new Client({
 const { Pool } = require("pg");
 
 const pool = new Pool({
-  host: "13.203.193.7",
+  host: "13.126.11.184",
   port: 5432,
-  database: "postgres",
-  user: "postgres",
+  database: "serveaso",
+  user: "serveaso",
   password: "serveaso",
   max: 10,
   idleTimeoutMillis: 30000,
