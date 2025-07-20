@@ -809,12 +809,11 @@ const createAuth0User = async (req, res) => {
       audience: `https://dev-plavkbiy7v55pbg4.us.auth0.com/api/v2/`,
       grant_type: "client_credentials"
     });
-    console.log("🔐 Access Token:", tokenRes.data.access_token);
 
     const accessToken = tokenRes.data.access_token;
 
     // 2. Create User in Auth0
-    const userRes = await axios.post(`https://${process.env.AUTH0_DOMAIN}/api/v2/users`, {
+    const userRes = await axios.post(`https://dev-plavkbiy7v55pbg4.us.auth0.com/api/v2/users`, {
       email,
       password,
       name,
