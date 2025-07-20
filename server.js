@@ -5,7 +5,7 @@ const swaggerUi = require('swagger-ui-express');
 const { swaggerSpec } = require('./docs/swaggerDocs');
 const { Server } = require('ws');
 const { Client } = require('pg');
-const { getRecords, getRecordById, addRecord, updateRecord, uploadExcel, deleteAll, deleteRecord , getUserSettingsRecords , getUserSettingsById , addSettings , deleteUserPreferenceRecord ,updateUserSettings , deleteUserSettings , deleteAlUserPreference } = require('./controllers/mongoDBControllers');
+const { getRecords, getRecordById, addRecord, updateRecord, uploadExcel, deleteAll, deleteRecord , getUserSettingsRecords , getUserSettingsById , addSettings , deleteUserPreferenceRecord ,updateUserSettings , deleteUserSettings , deleteAlUserPreference , createAuth0User } = require('./controllers/mongoDBControllers');
 const emailRoutes = require('./routes/emailRoutes');
 const bookemailRoutes = require('./routes/bookingemailRoutes');
 const rescheduleEmailRoutes = require('./routes/rescheduleEmailRoutes');
@@ -67,6 +67,8 @@ app.get('/records', async (req, res) => {
   res.json(records);
 });
 
+app.use("/authO", createAuth0User);
+
 app.get('/user-settings', async (req, res) => {
   const records = await getUserSettingsRecords();
   res.json(records);
@@ -83,6 +85,7 @@ app.get('/user-settings/:id', async (req, res) => {
   }
 });
 
+app.post('/authO', createAuth0User);
 app.post('/records', async (req, res) => {
   const recordData = req.body;
   try {
@@ -259,6 +262,12 @@ const pgClient = new Client({
 //   console.error('PostgreSQL client error:', error);
 // });
 
+// 🔒 Auth0 Management API credentials (store securely in .env)
+const AUTH0_DOMAIN = 'dev-y0yafxo2cjqtu8y2.us.auth0.com';
+const AUTH0_CLIENT_ID = 'YOUR_MANAGEMENT_CLIENT_ID';
+const AUTH0_CLIENT_SECRET = 'YOUR_MANAGEMENT_CLIENT_SECRET';
+const AUTH0_AUDIENCE = `https://${AUTH0_DOMAIN}/api/v2/`;
+
 const { Pool } = require("pg");
 
 const pool = new Pool({
@@ -271,6 +280,7 @@ const pool = new Pool({
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
 });
+
 
 app.get("/customer/check-email", async (req, res) => {
   const { email } = req.query;

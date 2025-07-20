@@ -3,6 +3,7 @@ const fs = require('fs');
 const xlsx = require('xlsx');
 const { ObjectId } = require('mongodb');  // Ensure ObjectId is imported
 
+const axios = require('axios');
 const uri = "mongodb://serveaso:serveaso@43.204.100.109:27017/?authSource=admin"; // Replace with your MongoDB URI
 const sslCA = fs.readFileSync('./global-bundle.p7b'); // Path to the CA file
 
@@ -389,6 +390,45 @@ const sslCA = fs.readFileSync('./global-bundle.p7b'); // Path to the CA file
  *                   type: boolean
  */
 
+// Route: Create Auth0 User
+/**
+ * @swagger
+ * /authO/create-autho-user:
+ *   post:
+ *     tags:
+ *       - Auth0
+ *     summary: Create a user in Auth0
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: User created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user_id:
+ *                   type: string
+ *       400:
+ *         description: Bad request
+ *       500:
+ *         description: Internal server error
+ */
+
+
 
 
 const deleteAll = async (req, res) => {
@@ -752,6 +792,49 @@ async function deleteUserPreferenceRecord (req, res) {
   }
 };
 
+const createAuth0User = async (req, res) => {
+  const { email, password, name } = req.body;
+
+  if (!email || !password || !name) {
+    return res.status(400).json({ error: "Email, name and password are required." });
+  }
+
+  console.log("Creating Auth0 user with email:", email);
+
+  try {
+    // 1. Get Auth0 Management API Token
+    const tokenRes = await axios.post(`https://dev-plavkbiy7v55pbg4.us.auth0.com/oauth/token`, {
+      client_id: "jFQGiT8Hb9KlNbdhb452TUhnjK7iroTj",
+      client_secret: "Ya_kgQTObJ7eE_9sV4JuUWHMPIY7F_WUeHk2L_0GBK85v35BD1YQK1j7vfyTxN5h",
+      audience: `https://dev-plavkbiy7v55pbg4.us.auth0.com/api/v2/`,
+      grant_type: "client_credentials"
+    });
+    console.log("🔐 Access Token:", tokenRes.data.access_token);
+
+    const accessToken = tokenRes.data.access_token;
+
+    // 2. Create User in Auth0
+    const userRes = await axios.post(`https://${process.env.AUTH0_DOMAIN}/api/v2/users`, {
+      email,
+      password,
+      name,
+      connection: "Username-Password-Authentication"
+    }, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
+    });
+
+    res.status(201).json({ message: "User created successfully", userId: userRes.data.user_id });
+  } catch (err) {
+    console.error("❌ Error creating Auth0 user:", err.response?.data || err.message);
+    res.status(500).json({
+      error: "Failed to create user",
+      details: err.response?.data || err.message
+    });
+  }
+};
+
  
 
 
@@ -770,5 +853,6 @@ module.exports = {
   deleteUserPreferenceRecord,
   updateUserSettings,
   deleteUserSettings,
-  deleteAlUserPreference
+  deleteAlUserPreference,
+  createAuth0User
 };
