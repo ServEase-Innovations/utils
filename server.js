@@ -231,36 +231,36 @@ const pgClient = new Client({
   connectionTimeoutMillis: 2000,
 });
 
-// pgClient.connect();
+pgClient.connect();
 
-// // Listen for notifications on PostgreSQL
-// pgClient.query('LISTEN engagement_insert');
+// Listen for notifications on PostgreSQL
+pgClient.query('LISTEN engagement_insert');
 
-// // Handle PostgreSQL notifications
-// pgClient.on('notification', (msg) => {
-//   try {
-//     console.log('Notification received:', msg.payload);
+// Handle PostgreSQL notifications
+pgClient.on('notification', (msg) => {
+  try {
+    console.log('Notification received:', msg.payload);
 
-//     const payload = JSON.parse(msg.payload);
-//     const serviceProviderId = payload.serviceproviderid.toString();
+    const payload = JSON.parse(msg.payload);
+    const serviceProviderId = payload.serviceproviderid.toString();
 
-//     // Check if there's an active WebSocket connection for the serviceProviderId
-//     if (connectedNumbers.has(serviceProviderId)) {
-//       const client = connectedNumbers.get(serviceProviderId);
-//       if (client && client.readyState === WebSocket.OPEN) {
-//         client.send(`New data inserted for ServiceProviderID: ${serviceProviderId}`);
-//       }
-//     } else {
-//       console.log(`No connected client for ServiceProviderID: ${serviceProviderId}`);
-//     }
-//   } catch (error) {
-//     console.error('Error processing notification:', error);
-//   }
-// });
+    // Check if there's an active WebSocket connection for the serviceProviderId
+    if (connectedNumbers.has(serviceProviderId)) {
+      const client = connectedNumbers.get(serviceProviderId);
+      if (client && client.readyState === WebSocket.OPEN) {
+        client.send(`New data inserted for ServiceProviderID: ${serviceProviderId}`);
+      }
+    } else {
+      console.log(`No connected client for ServiceProviderID: ${serviceProviderId}`);
+    }
+  } catch (error) {
+    console.error('Error processing notification:', error);
+  }
+});
 
-// pgClient.on('error', (error) => {
-//   console.error('PostgreSQL client error:', error);
-// });
+pgClient.on('error', (error) => {
+  console.error('PostgreSQL client error:', error);
+});
 
 // 🔒 Auth0 Management API credentials (store securely in .env)
 const AUTH0_DOMAIN = 'dev-y0yafxo2cjqtu8y2.us.auth0.com';
