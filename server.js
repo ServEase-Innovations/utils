@@ -29,6 +29,19 @@ const emailPort = 4000;
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
 
+const { Pool } = require("pg");
+
+const pool = new Pool({
+  host: "13.126.11.184",
+  port: 5432,
+  database: "serveaso",
+  user: "serveaso",
+  password: "serveaso",
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+});
+
 const checkJwt = jwt({
   secret: jwksRsa.expressJwtSecret({
     cache: true,
@@ -231,13 +244,13 @@ const pgClient = new Client({
   connectionTimeoutMillis: 2000,
 });
 
-pgClient.connect();
+pool.connect();
 
 // Listen for notifications on PostgreSQL
-pgClient.query('LISTEN engagement_insert');
+pool.query('LISTEN engagement_insert');
 
 // Handle PostgreSQL notifications
-pgClient.on('notification', (msg) => {
+pool.on('notification', (msg) => {
   try {
     console.log('Notification received:', msg.payload);
 
@@ -258,7 +271,7 @@ pgClient.on('notification', (msg) => {
   }
 });
 
-pgClient.on('error', (error) => {
+pool.on('error', (error) => {
   console.error('PostgreSQL client error:', error);
 });
 
@@ -268,18 +281,7 @@ const AUTH0_CLIENT_ID = 'YOUR_MANAGEMENT_CLIENT_ID';
 const AUTH0_CLIENT_SECRET = 'YOUR_MANAGEMENT_CLIENT_SECRET';
 const AUTH0_AUDIENCE = `https://${AUTH0_DOMAIN}/api/v2/`;
 
-const { Pool } = require("pg");
 
-const pool = new Pool({
-  host: "13.126.11.184",
-  port: 5432,
-  database: "serveaso",
-  user: "serveaso",
-  password: "serveaso",
-  max: 10,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-});
 
 
 app.get("/customer/check-email", async (req, res) => {
