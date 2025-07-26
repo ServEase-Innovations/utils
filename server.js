@@ -23,7 +23,7 @@ const jwksRsa = require('jwks-rsa');
 
 const app = express();
 const appForEmail = express();
-const port = 3000;
+const port = 5000;
 const emailPort = 4000;
 
 const storage = multer.memoryStorage();
@@ -199,81 +199,73 @@ emailServer.listen(emailPort, () => {
 const wss = new Server({ server });
 const connectedNumbers = new Map();
 
-wss.on('connection', (ws) => {
-  // Handle incoming messages from the WebSocket client
-  ws.on('message', (message) => {
-    const number = message.toString().trim();
-    console.log('Received number:', number);
-    if (number) {
-      connectedNumbers.set(number, ws);
-      console.log('Connected numbers:', Array.from(connectedNumbers.keys()));
-    }
-  });
 
-  // Handle WebSocket client closure without crashing the app
-  ws.on('close', () => {
+wss.on("connection", (ws) => {
+  console.log("🔌 WebSocket client connected");
+
+  ws.on("message", (data) => {
     try {
-      // Try to remove the client from connectedNumbers map
-      for (const [key, client] of connectedNumbers.entries()) {
-        if (client === ws) {
-          connectedNumbers.delete(key);
-          console.log(`WebSocket client disconnected for number: ${key}`);
-          break;
-        }
+      const parsed = JSON.parse(data.toString());
+
+      if (parsed?.type === "IDENTIFY" && parsed?.id) {
+        connectedNumbers.set(parsed.id, ws);
+        console.log(`✅ Client ${parsed.id} identified and connected`);
+      } else {
+        console.warn("⚠️ Unknown message format:", parsed);
       }
-    } catch (error) {
-      console.error('Error during client disconnection:', error);
+    } catch (err) {
+      console.error("❌ Failed to parse message:", err);
     }
   });
 
-  // Handle WebSocket errors gracefully
-  ws.on('error', (err) => {
-    console.error('WebSocket error:', err);
+  ws.on("close", () => {
+    for (const [key, value] of connectedNumbers.entries()) {
+      if (value === ws) {
+        connectedNumbers.delete(key);
+        console.log(`🛑 Client ${key} disconnected`);
+        break;
+      }
+    }
   });
 });
 
-// ✅ PostgreSQL client
-const pgClient = new Client({
-  host: "13.203.193.7",
-  port: 5432,
-  database: "postgres",
-  user: "postgres",
-  password: "serveaso",
-  max: 10, // max connections
-  idleTimeoutMillis: 30000, // close idle clients after 30s
-  connectionTimeoutMillis: 2000,
-});
+// Dedicated Postgres client for LISTEN/NOTIFY
+(async () => {
+  const pgClient = new Client({
+    host: "13.126.11.184",
+    port: 5432,
+    database: "serveaso",
+    user: "serveaso",
+    password: "serveaso",
+  });
 
-pool.connect();
+  await pgClient.connect();
+  await pgClient.query("LISTEN engagement_insert");
 
-// Listen for notifications on PostgreSQL
-pool.query('LISTEN engagement_insert');
+  console.log("📡 Listening to engagement_insert notifications...");
 
-// Handle PostgreSQL notifications
-pool.on('notification', (msg) => {
-  try {
-    console.log('Notification received:', msg.payload);
+  pgClient.on("notification", (msg) => {
+    try {
+      const payload = JSON.parse(msg.payload);
+      const serviceProviderId = payload.serviceproviderid?.toString();
 
-    const payload = JSON.parse(msg.payload);
-    const serviceProviderId = payload.serviceproviderid.toString();
+      console.log("📨 New notification for:", serviceProviderId);
 
-    // Check if there's an active WebSocket connection for the serviceProviderId
-    if (connectedNumbers.has(serviceProviderId)) {
-      const client = connectedNumbers.get(serviceProviderId);
-      if (client && client.readyState === WebSocket.OPEN) {
-        client.send(`New data inserted for ServiceProviderID: ${serviceProviderId}`);
+      const targetWs = connectedNumbers.get(serviceProviderId);
+      if (targetWs && targetWs.readyState === WebSocket.OPEN) {
+        targetWs.send(`New booking assigned to you (ID: ${serviceProviderId})`);
+      } else {
+        console.log(`⚠️ No active WebSocket for provider ${serviceProviderId}`);
       }
-    } else {
-      console.log(`No connected client for ServiceProviderID: ${serviceProviderId}`);
+    } catch (err) {
+      console.error("❌ Failed to handle notification payload:", err);
     }
-  } catch (error) {
-    console.error('Error processing notification:', error);
-  }
-});
+  });
 
-pool.on('error', (error) => {
-  console.error('PostgreSQL client error:', error);
-});
+  pgClient.on("error", (err) => {
+    console.error("❌ PostgreSQL error:", err);
+  });
+})();
 
 // 🔒 Auth0 Management API credentials (store securely in .env)
 const AUTH0_DOMAIN = 'dev-y0yafxo2cjqtu8y2.us.auth0.com';
