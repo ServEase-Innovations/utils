@@ -343,84 +343,11 @@ const users = {
   }
 };
 
-// Step 1: Login with username/password
-// app.post("/api/login", (req, res) => {
-//   const { username, password } = req.body;
-//   const user = users[username];
-
-//   if (!user || user.password !== password) {
-//     return res.status(401).json({ message: "Invalid credentials" });
-//   }
-
-//   // Step 2FA required
-//   return res.json({
-//     message: "Login valid, 2FA required",
-//     secret: user.secret
-//   });
-// });
-
-// Step 2: Verify 2FA token
-// app.post("/api/2fa/verify-login", (req, res) => {
-//   const { token, username } = req.body;
-//   const user = users[username];
-
-//   const verified = speakeasy.totp.verify({
-//     secret: user.secret,
-//     encoding: "base32",
-//     token,
-//     window: 1
-//   });
-
-//   res.json({ success: verified });
-// });
-
 mongoose.connect("mongodb://serveaso:serveaso@43.204.100.109:27017/?authSource=admin", {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
 
-
-// let userSecret = null;
-// app.get("/api/2fa/setup", async (req, res) => {
-//   const secret = speakeasy.generateSecret({
-//     name: "Servease Admin Dashboard"
-//   });
-//   userSecret = secret.base32;
-
-//   const qrDataUrl = await qrcode.toDataURL(secret.otpauth_url);
-//   res.json({ qrCode: qrDataUrl, secret: secret.base32 });
-// });
-
-// // Step 2: Verify TOTP
-// app.post("/api/2fa/verify", (req, res) => {
-//   const { token } = req.body;
-
-//   const verified = speakeasy.totp.verify({
-//     secret: userSecret,
-//     encoding: "base32",
-//     token
-//   });
-
-//   res.json({ verified });
-// });
-
-// app.post("/api/2fa/verify-login", (req, res) => {
-//   const { token, username } = req.body;
-//   const user = users[username];
-
-//   if (!user || !user.secret) {
-//     return res.status(400).json({ success: false, message: "User or secret not found" });
-//   }
-
-//   const verified = speakeasy.totp.verify({
-//     secret: user.secret,
-//     encoding: "base32",
-//     token,
-//     window: 1
-//   });
-
-//   return res.json({ success: verified });
-// });
 
 app.post("/api/register", async (req, res) => {
   const { username, password } = req.body;
@@ -435,8 +362,7 @@ app.post("/api/register", async (req, res) => {
   const user = new User({
     username,
     hashedPassword,
-    totpSecret: secret.base32,
-    role: "SuperAdmin", // Default role for first-time register
+    totpSecret: secret.base32
   });
 
   await user.save();
@@ -466,18 +392,6 @@ app.post("/api/2fa/verify", async (req, res) => {
   res.json({ message: "2FA verified successfully", role: user.role });
 });
 
-// app.post("/api/login", async (req, res) => {
-//   const { username, password } = req.body;
-//   const user = await User.findOne({ username });
-
-//   if (!user) return res.status(401).json({ message: "User not found" });
-
-//   const isMatch = await bcrypt.compare(password, user.password);
-//   if (!isMatch) return res.status(401).json({ message: "Invalid password" });
-
-//   // Don't send secret to client, just confirm 2FA needed
-//   res.json({ message: "2FA required", username: user.username });
-// });
 
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
@@ -495,29 +409,27 @@ app.post('/api/login', async (req, res) => {
 
 
 
-app.post('/api/verify-2fa', async (req, res) => {
-  const { userId, token } = req.body;
-  const user = await User.findById(userId);
+app.post("/api/verify", async (req, res) => {
+  const { username, token } = req.body;
+  console.log("Verifying:", username, token);
+
+  const user = await User.findOne({ username });
   if (!user || !user.totpSecret) {
-    return res.status(400).json({ message: "2FA not configured" });
+    return res.status(400).json({ message: "User not found or 2FA not configured" });
   }
 
-  const verified = speakeasy.totp.verify({
+  const isVerified = speakeasy.totp.verify({
     secret: user.totpSecret,
-    encoding: 'base32',
+    encoding: "base32",
     token,
-    window: 1
+    window: 1,
   });
 
-  if (!verified) {
-    return res.status(401).json({ message: "Invalid 2FA code" });
+  if (!isVerified) {
+    return res.status(401).json({ message: "Invalid token" });
   }
 
-  // ✅ At this point, you can generate a session or JWT token
-  // Example:
-  // const token = jwt.sign({ userId: user._id }, "jwt-secret", { expiresIn: "1h" });
-
-  return res.status(200).json({ message: "Login successful" /*, token*/ });
+  return res.json({ message: "2FA verification successful" });
 });
 
 
@@ -529,6 +441,10 @@ app.post("/api/verify-token", async (req, res) => {
   const user = await User.findOne({ username });
   if (!user) return res.status(400).json({ message: "User not found" });
 
+  if (!user.totpSecret) {
+    return res.status(400).json({ message: "2FA not configured" });
+  }
+
   const verified = speakeasy.totp.verify({
     secret: user.totpSecret,
     encoding: "base32",
@@ -537,11 +453,17 @@ app.post("/api/verify-token", async (req, res) => {
   });
 
   if (!verified) {
+    await new Promise(resolve => setTimeout(resolve, 1000)); // basic rate limit
     return res.status(400).json({ message: "Invalid token" });
   }
 
-  res.json({ message: "2FA verified successfully", role: user.role });
+  res.json({
+    message: "2FA verified successfully",
+    role: user.role,
+    userId: user._id
+  });
 });
+
 
 
 // Handle any uncaught exceptions in the application
