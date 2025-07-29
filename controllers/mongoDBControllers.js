@@ -2,10 +2,21 @@ const { MongoClient } = require('mongodb');
 const fs = require('fs');
 const xlsx = require('xlsx');
 const { ObjectId } = require('mongodb');  // Ensure ObjectId is imported
+const mongoose = require("mongoose");
 
 const axios = require('axios');
 const uri = "mongodb://serveaso:serveaso@43.204.100.109:27017/?authSource=admin"; // Replace with your MongoDB URI
 const sslCA = fs.readFileSync('./global-bundle.p7b'); // Path to the CA file
+
+
+mongoose.connect("mongodb://serveaso:serveaso@43.204.100.109:27017/?authSource=admin", {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+
+// const userSchema = require("../models/User")
+
+const userSchema = require("../models/User");
 
 
 /**
@@ -428,7 +439,145 @@ const sslCA = fs.readFileSync('./global-bundle.p7b'); // Path to the CA file
  *         description: Internal server error
  */
 
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     User:
+ *       type: object
+ *       required:
+ *         - username
+ *         - hashedPassword
+ *       properties:
+ *         _id:
+ *           type: string
+ *         username:
+ *           type: string
+ *         hashedPassword:
+ *           type: string
+ *         totpSecret:
+ *           type: string
+ *         role:
+ *           type: string
+ *           enum: [SuperAdmin, Admin, User]
+ */
 
+/**
+ * @swagger
+ * /users:
+ *   get:
+ *     summary: Get all users (Admin only)
+ *     tags: [Admin]
+ *     responses:
+ *       200:
+ *         description: List of users
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/User'
+ *       403:
+ *         description: Forbidden
+ */
+
+
+/**
+ * @swagger
+ * /users/{id}:
+ *   put:
+ *     summary: Update a user by ID (Admin only)
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/User'
+ *     responses:
+ *       200:
+ *         description: Updated user
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/User'
+ *       403:
+ *         description: Forbidden
+ */
+
+const updateAdmin = async (req, res) => {
+  try {
+    const updatedUser = await userSchema.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    res.json(updatedUser);
+  } catch (error) {
+    console.error("Error updating user:", error);
+    res.status(500).json({ message: "Server error while updating user." });
+  }
+};
+
+/**
+ * @swagger
+ * /users/{id}:
+ *   delete:
+ *     summary: Delete a user by ID (Admin only)
+ *     tags: [Admin]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ID
+ *     responses:
+ *       200:
+ *         description: Deleted user
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/User'
+ *       403:
+ *         description: Forbidden
+ */
+
+const deleteAdmin = async (req, res) => {
+  try {
+    const deletedUser = await userSchema.findByIdAndDelete(req.params.id);
+
+    if (!deletedUser) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    res.json(deletedUser);
+  } catch (error) {
+    console.error("Error deleting user:", error);
+    res.status(500).json({ message: "Server error while deleting user." });
+  }
+};
+
+const getAllAdmins = async (req, res) => {
+  try {
+    const users = await userSchema.find();
+    res.json(users);
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ message: "Server error while retrieving users." });
+  }
+};
 
 
 const deleteAll = async (req, res) => {
@@ -853,5 +1002,8 @@ module.exports = {
   updateUserSettings,
   deleteUserSettings,
   deleteAlUserPreference,
-  createAuth0User
+  createAuth0User,
+  deleteAdmin, 
+  updateAdmin,
+  getAllAdmins
 };

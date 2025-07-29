@@ -5,7 +5,7 @@ const swaggerUi = require('swagger-ui-express');
 const { swaggerSpec } = require('./docs/swaggerDocs');
 const { Server } = require('ws');
 const { Client } = require('pg');
-const { getRecords, getRecordById, addRecord, updateRecord, uploadExcel, deleteAll, deleteRecord , getUserSettingsRecords , getUserSettingsById , addSettings , deleteUserPreferenceRecord ,updateUserSettings , deleteUserSettings , deleteAlUserPreference , createAuth0User } = require('./controllers/mongoDBControllers');
+const { getRecords, getRecordById, addRecord, updateRecord, uploadExcel, deleteAll, deleteRecord , getUserSettingsRecords , getUserSettingsById , addSettings , deleteUserPreferenceRecord ,updateUserSettings , deleteUserSettings , deleteAlUserPreference , createAuth0User  , deleteAdmin , updateAdmin , getAllAdmins} = require('./controllers/mongoDBControllers');
 const emailRoutes = require('./routes/emailRoutes');
 const bookemailRoutes = require('./routes/bookingemailRoutes');
 const rescheduleEmailRoutes = require('./routes/rescheduleEmailRoutes');
@@ -87,6 +87,12 @@ app.get('/records', async (req, res) => {
 });
 
 app.use("/authO", createAuth0User);
+
+app.delete("/users/:id", deleteAdmin);
+
+app.put("/users/:id", updateAdmin);
+
+app.get("/users",  getAllAdmins);
 
 app.get('/user-settings', async (req, res) => {
   const records = await getUserSettingsRecords();
