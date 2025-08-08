@@ -29,7 +29,7 @@ const speakeasy = require("speakeasy");
 
 const app = express();
 const appForEmail = express();
-const port = 3000;
+const port = 5000;
 const emailPort = 4000;
 
 const storage = multer.memoryStorage();
@@ -220,8 +220,17 @@ wss.on("connection", (ws) => {
       const parsed = JSON.parse(data.toString());
 
       if (parsed?.type === "IDENTIFY" && parsed?.id) {
-        connectedNumbers.set(parsed.id, ws);
-        console.log(`✅ Client ${parsed.id} identified and connected`);
+        const idKey = String(parsed.id); // normalize ID
+        connectedNumbers.set(idKey, ws);
+        console.log(`✅ Client ${idKey} identified and connected`);
+
+        // Send confirmation immediately so client can test onmessage
+        ws.send(
+          JSON.stringify({
+            type: "CONFIRM_IDENTIFY",
+            message: `You are now registered as ${idKey}`,
+          })
+        );
       } else {
         console.warn("⚠️ Unknown message format:", parsed);
       }
@@ -238,6 +247,10 @@ wss.on("connection", (ws) => {
         break;
       }
     }
+  });
+
+  ws.on("error", (err) => {
+    console.error("⚠️ WebSocket error:", err);
   });
 });
 
@@ -257,15 +270,24 @@ wss.on("connection", (ws) => {
   console.log("📡 Listening to engagement_insert notifications...");
 
   pgClient.on("notification", (msg) => {
+    console.log("🔍 Raw PG payload:", msg.payload);
+
     try {
       const payload = JSON.parse(msg.payload);
-      const serviceProviderId = payload.serviceproviderid?.toString();
+      const serviceProviderId = String(payload.serviceproviderid);
 
       console.log("📨 New notification for:", serviceProviderId);
 
       const targetWs = connectedNumbers.get(serviceProviderId);
       if (targetWs && targetWs.readyState === WebSocket.OPEN) {
-        targetWs.send(`New booking assigned to you (ID: ${serviceProviderId})`);
+        targetWs.send(
+          JSON.stringify({
+            type: "NEW_BOOKING",
+            message: `New booking assigned to you`,
+            bookingId: payload.bookingid ?? null,
+          })
+        );
+        console.log(`✅ Sent message to provider ${serviceProviderId}`);
       } else {
         console.log(`⚠️ No active WebSocket for provider ${serviceProviderId}`);
       }
