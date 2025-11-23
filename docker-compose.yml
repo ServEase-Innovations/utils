@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  mongo:
+    image: mongo:6
+    container_name: chat_mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    image: redis:7-alpine
+    container_name: chat_redis
+    restart: always
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  server:
+    build: .
+    container_name: chat_server
+    restart: always
+    depends_on:
+      - mongo
+      - redis
+    ports:
+      - "3001:3001"
+    environment:
+      MONGO_URI: mongodb://mongo:27017/chatdb
+      REDIS_URL: redis://redis:6379
+      TZ: Asia/Kolkata
+    command: ["node", "server.js"]
+
+volumes:
+  mongo_data:
+  redis_data:

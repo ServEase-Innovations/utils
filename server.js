@@ -25,6 +25,8 @@ const User = require("./models/User");
 const bcrypt = require("bcrypt");
 const QRCode = require("qrcode");
 const speakeasy = require("speakeasy");
+const config = require("./config/config");
+
 
 
 const app = express();
@@ -38,13 +40,13 @@ const upload = multer({ storage: storage });
 const { Pool } = require("pg");
 
 const pool = new Pool({
-  host: "13.126.11.184",
-  port: 5432,
-  database: "serveaso",
-  user: "serveaso",
-  password: "serveaso",
+  host: config.PG_HOST,
+  port: config.PG_PORT,
+  database: config.PG_DB,
+  user: config.PG_USER,
+  password: config.PG_PASSWORD,
   max: 10,
-  idleTimeoutMillis: 30000,
+  idleTimeoutMillis: 30010,
   connectionTimeoutMillis: 2000,
 });
 
@@ -52,10 +54,10 @@ const checkJwt = jwt({
   secret: jwksRsa.expressJwtSecret({
     cache: true,
     rateLimit: true,
-    jwksUri: `https://${process.env.AUTH0_DOMAIN}/.well-known/jwks.json`,
+    jwksUri: `https://${config.AUTH0_DOMAIN}/.well-known/jwks.json`,
   }),
-  audience: process.env.AUTH0_AUDIENCE,
-  issuer: `https://${process.env.AUTH0_DOMAIN}/`,
+  audience: config.AUTH0_AUDIENCE,
+  issuer: `https://${config.AUTH0_DOMAIN}/`,
   algorithms: ['RS256'],
 });
 
@@ -69,8 +71,8 @@ app.get('/api/protected', checkJwt, (req, res) => {
 });
 
 const razorpay = new Razorpay({
-  key_id: "rzp_test_lTdgjtSRlEwreA",
-  key_secret: "g15WB8CEwaYBQ5FqpIKKMdNS",
+  key_id: config.RAZORPAY_KEY_ID,
+  key_secret: config.RAZORPAY_KEY_SECRET,
 });
 
 // Middleware
@@ -254,58 +256,6 @@ wss.on("connection", (ws) => {
   });
 });
 
-// Dedicated Postgres client for LISTEN/NOTIFY
-(async () => {
-  const pgClient = new Client({
-    host: "13.126.11.184",
-    port: 5432,
-    database: "serveaso",
-    user: "serveaso",
-    password: "serveaso",
-  });
-
-  await pgClient.connect();
-  await pgClient.query("LISTEN engagement_insert");
-
-  console.log("📡 Listening to engagement_insert notifications...");
-
-  pgClient.on("notification", (msg) => {
-    console.log("🔍 Raw PG payload:", msg.payload);
-
-    try {
-      const payload = JSON.parse(msg.payload);
-      const serviceProviderId = String(payload.serviceproviderid);
-
-      console.log("📨 New notification for:", serviceProviderId);
-
-      const targetWs = connectedNumbers.get(serviceProviderId);
-      if (targetWs && targetWs.readyState === WebSocket.OPEN) {
-        targetWs.send(
-          JSON.stringify({
-            type: "NEW_BOOKING",
-            message: `New booking assigned to you`,
-            bookingId: payload.bookingid ?? null,
-          })
-        );
-        console.log(`✅ Sent message to provider ${serviceProviderId}`);
-      } else {
-        console.log(`⚠️ No active WebSocket for provider ${serviceProviderId}`);
-      }
-    } catch (err) {
-      console.error("❌ Failed to handle notification payload:", err);
-    }
-  });
-
-  pgClient.on("error", (err) => {
-    console.error("❌ PostgreSQL error:", err);
-  });
-})();
-
-// 🔒 Auth0 Management API credentials (store securely in .env)
-const AUTH0_DOMAIN = 'dev-y0yafxo2cjqtu8y2.us.auth0.com';
-const AUTH0_CLIENT_ID = 'YOUR_MANAGEMENT_CLIENT_ID';
-const AUTH0_CLIENT_SECRET = 'YOUR_MANAGEMENT_CLIENT_SECRET';
-const AUTH0_AUDIENCE = `https://${AUTH0_DOMAIN}/api/v2/`;
 
 
 
@@ -370,11 +320,6 @@ const users = {
     secret: speakeasy.generateSecret({ name: "Servease Admin" }).base32
   }
 };
-
-mongoose.connect("mongodb://serveaso:serveaso@43.204.100.109:27017/?authSource=admin", {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
 
 
 app.post("/api/register", async (req, res) => {

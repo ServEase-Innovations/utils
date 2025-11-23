@@ -3,18 +3,15 @@ const fs = require('fs');
 const xlsx = require('xlsx');
 const { ObjectId } = require('mongodb');  // Ensure ObjectId is imported
 const mongoose = require("mongoose");
+const config = require("../config/config");
 
 const axios = require('axios');
-const uri = "mongodb://serveaso:serveaso@43.204.100.109:27017/?authSource=admin"; // Replace with your MongoDB URI
-const sslCA = fs.readFileSync('./global-bundle.p7b'); // Path to the CA file
+const uri = config.MONGO_URI;
+const sslCA = config.MONGO_SSL_CA_PATH;
 
 
-mongoose.connect("mongodb://serveaso:serveaso@43.204.100.109:27017/?authSource=admin", {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
 
-// const userSchema = require("../models/User")
+
 
 const userSchema = require("../models/User");
 
