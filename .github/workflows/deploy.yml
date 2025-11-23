@@ -7,34 +7,31 @@ on:
         description: "Select Environment"
         required: true
         type: choice
-        options:
-          - dev
-          - qa
-          - uat
-          - prod
+        options: [dev, qa, uat, prod]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # ------------------------------
-      # CHECKOUT REPOSITORY
-      # ------------------------------
+
+      # -------------------------
+      # 1. Checkout Repo
+      # -------------------------
       - name: Checkout code
         uses: actions/checkout@v3
         with:
           fetch-depth: 1
 
-      # ------------------------------
-      # PREPARE CLEAN DEPLOY FOLDER
-      # ------------------------------
+      # -------------------------
+      # 2. Prepare Deploy Folder
+      # -------------------------
       - name: Prepare deploy folder
         run: |
           rm -rf deploy
           mkdir deploy
 
-          # Copy ONLY required source files
+          # Copy production code files
           cp server.js deploy/
           cp package.json deploy/
           cp package-lock.json deploy/
@@ -49,80 +46,49 @@ jobs:
           cp global-bundle.pem deploy/ || true
           cp global-bundle.p7b deploy/ || true
 
-          # ------------------------------
-          # CREATE ENV FILE BASED ON DROPDOWN
-          # ------------------------------
-          # GitHub Actions does NOT allow dynamic secrets using upper-case interpolation directly
-          # So we use eval on EC2 instead — more reliable
-          cat <<EOF > deploy/.env
-          PROFILE=${{ github.event.inputs.environment }}
+          # Copy PM2 ecosystem file
+          cp ecosystem.config.js deploy/
 
-          # Razorpay
-          RAZORPAY_KEY_ID=${{ secrets.RAZORPAY_KEY_ID }}
-          RAZORPAY_KEY_SECRET=${{ secrets.RAZORPAY_KEY_SECRET }}
-          
-          # Mongo (fixed for QA or env based)
-          MONGO_URI=${{ secrets.MONGO_URI_QA }}
-          
-          # PostgreSQL (example QA)
-          PG_HOST=${{ secrets.PG_HOST_QA }}
-          PG_USER=${{ secrets.PG_USER_QA }}
-          PG_PASS=${{ secrets.PG_PASS_QA }}
-          EOF
+          # Write environment variable
+          echo "PROFILE=${{ github.event.inputs.environment }}" > deploy/.env
 
-          echo "Deploy folder contents:"
+          echo "Prepared deploy folder:"
           ls -l deploy
 
-      # ------------------------------
-      # UPLOAD USING SCP
-      # ------------------------------
-      - name: Upload files to EC2
+      # -------------------------
+      # 3. Upload Files to EC2
+      # -------------------------
+      - name: Upload to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
-          source: "deploy/*"
+          source: "deploy/**"
           target: "/home/ubuntu/utils/"
           overwrite: true
           debug: true
 
-      - name: Verify .env exists on EC2
+      # -------------------------
+      # 4. Restart Node.js on EC2 using PM2 + ecosystem
+      # -------------------------
+      - name: Restart Node App
         uses: appleboy/ssh-action@v1.1.0
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           script: |
-            echo "=== Checking .env file ==="
-            ls -l /home/ubuntu/utils/.env || echo "❌ .env file DOES NOT EXIST"
-
-            echo "=== Printing .env ==="
-            cat /home/ubuntu/utils/.env || echo "❌ Cannot read .env file"
-
-
-      # ------------------------------
-      # SSH & RESTART PM2
-      # ------------------------------
-      - name: Restart Node App on EC2
-        uses: appleboy/ssh-action@v1.1.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
-          script: |
-            echo "=== Switching to app directory ==="
-            cd /home/ubuntu/utils
-
             echo "=== Installing Dependencies ==="
+            cd /home/ubuntu/utils
             npm install --force
 
-            echo "=== Restarting PM2 ==="
+            echo "=== Starting/Restarting PM2 App ==="
             pm2 restart ecosystem.config.js --update-env || pm2 start ecosystem.config.js --update-env
             pm2 save
 
             echo "=== PM2 Status ==="
             pm2 status
 
-            echo "=== .env ==="
-            cat .env
+            echo "=== Printing .env ==="
+            cat /home/ubuntu/utils/.env
