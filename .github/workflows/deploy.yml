@@ -1,4 +1,4 @@
-name: Deploy Utils Node Backend
+name: Deploy Utils API
 
 on:
   workflow_dispatch:
@@ -7,116 +7,73 @@ on:
         description: "Select Environment"
         required: true
         type: choice
-        options:
-          - dev
-          - qa
-          - uat
-          - prod
+        options: [dev, qa, uat, prod]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-    # ------------------------------
-    # Select Branch + Profile
-    # ------------------------------
-    - name: Select Branch & Profile
-      id: select
-      run: |
-        if [ "${{ github.event.inputs.environment }}" = "dev" ]; then
-          echo "branch=main" >> $GITHUB_OUTPUT
-          echo "profile=dev" >> $GITHUB_OUTPUT
 
-        elif [ "${{ github.event.inputs.environment }}" = "qa" ]; then
-          echo "branch=qa" >> $GITHUB_OUTPUT
-          echo "profile=qa" >> $GITHUB_OUTPUT
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
 
-        elif [ "${{ github.event.inputs.environment }}" = "uat" ]; then
-          echo "branch=uat" >> $GITHUB_OUTPUT
-          echo "profile=uat" >> $GITHUB_OUTPUT
-
-        elif [ "${{ github.event.inputs.environment }}" = "prod" ]; then
-          echo "branch=master" >> $GITHUB_OUTPUT
-          echo "profile=prod" >> $GITHUB_OUTPUT
-        fi
-
-        echo "Selected Branch: ${{ steps.select.outputs.branch }}"
-        echo "Selected Profile: ${{ steps.select.outputs.profile }}"
-
-    # ------------------------------
-    # Checkout the correct branch
-    # ------------------------------
-    - name: Checkout Code
-      uses: actions/checkout@v3
-      with:
-        ref: ${{ steps.select.outputs.branch }}
-
-    # ------------------------------
-    # Install Dependencies
-    # ------------------------------
-    - name: Install Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
-
-    - name: Install NPM dependencies
-      run: npm install
-
-    # ------------------------------
-    # Create deploy folder
-    # ------------------------------
-    - name: Prepare deploy folder
-      run: |
+      - name: Prepare deploy folder (NO .git, NO junk files)
+        run: |
           rm -rf deploy
           mkdir deploy
 
-          shopt -s dotglob
-          for item in *; do
-            [[ "$item" == "deploy" ]] && continue
-            [[ "$item" == ".git" ]] && continue
-            [[ "$item" == ".github" ]] && continue
-            cp -r "$item" deploy/
-          done
+          # copy source files ONLY
+          cp server.js deploy/
+          cp package.json deploy/
+          cp package-lock.json deploy/
+          cp -r controllers deploy/
+          cp -r models deploy/
+          cp -r routes deploy/
+          cp -r services deploy/
+          cp -r config deploy/
+          cp -r public deploy/
+          cp -r views deploy/
+          cp -r docs deploy/
+          cp global-bundle.pem deploy/ || true
+          cp global-bundle.p7b deploy/ || true
 
+          # write environment to .env
           echo "PROFILE=${{ github.event.inputs.environment }}" > deploy/.env
-          ls -ltr deploy
 
+          echo "Prepared deploy folder:"
+          ls -l deploy
 
-    # ------------------------------
-    # Copy to EC2
-    # ------------------------------
-    - name: Upload Backend to EC2
-      uses: appleboy/scp-action@v0.1.7
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USER }}
-        key: ${{ secrets.EC2_KEY }}
-        source: "deploy/*"
-        target: "/home/ubuntu/utils/"
-        overwrite: true
-        debug: true
+      - name: Upload files to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          source: "deploy/*"
+          target: "/home/ubuntu/utils/"
+          overwrite: true
+          debug: true
 
-    # ------------------------------
-    # Restart Node using PM2
-    # ------------------------------
-    - name: Restart Node App
-      uses: appleboy/ssh-action@v1.1.0
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USER }}
-        key: ${{ secrets.EC2_KEY }}
-        script: |
-          echo "=== Restarting Node.js App ==="
-          cd /home/ubuntu/utils
+      - name: Restart Node App on EC2
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            echo "=== Installing Dependencies ==="
+            cd /home/ubuntu/utils
+            npm install --force
 
-          npm install
+            echo "=== Restarting PM2 ==="
+            pm2 restart utils || pm2 start server.js --name utils
+            pm2 save
 
-          pm2 restart utils || pm2 start server.js --name utils
-          pm2 save
+            echo "=== PM2 Status ==="
+            pm2 status
 
-          echo "=== PM2 Status ==="
-          pm2 status
-
-          echo "=== Current .env ==="
-          cat /home/ubuntu/utils/.env
+            echo "=== .env file ==="
+            cat /home/ubuntu/utils/.env
