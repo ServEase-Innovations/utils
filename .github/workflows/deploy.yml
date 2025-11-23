@@ -1,0 +1,111 @@
+name: Deploy Servease Backend
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Select Environment"
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - uat
+          - prod
+
+jobs:
+
+  select-environment:
+    runs-on: ubuntu-latest
+    outputs:
+      branch: ${{ steps.set.outputs.branch }}
+      profile: ${{ steps.set.outputs.profile }}
+    steps:
+      - name: Select Branch & Profile
+        id: set
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+
+          if [ "$ENV" = "dev" ]; then
+            echo "branch=main" >> $GITHUB_OUTPUT
+            echo "profile=dev" >> $GITHUB_OUTPUT
+
+          elif [ "$ENV" = "qa" ]; then
+            echo "branch=qa" >> $GITHUB_OUTPUT
+            echo "profile=qa" >> $GITHUB_OUTPUT
+
+          elif [ "$ENV" = "uat" ]; then
+            echo "branch=uat" >> $GITHUB_OUTPUT
+            echo "profile=uat" >> $GITHUB_OUTPUT
+
+          elif [ "$ENV" = "prod" ]; then
+            echo "branch=master" >> $GITHUB_OUTPUT
+            echo "profile=prod" >> $GITHUB_OUTPUT
+          fi
+
+  build-and-package:
+    needs: select-environment
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-path: deploy/app.jar
+
+    steps:
+      - name: Checkout correct branch
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ needs.select-environment.outputs.branch }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Build with Maven
+        run: |
+          mvn clean package -Dspring.profiles.active=${{ needs.select-environment.outputs.profile }} -DskipTests
+
+      - name: Prepare JAR
+        run: |
+          mkdir -p deploy
+          cp target/*.jar deploy/app.jar
+          ls -ltr deploy
+
+  deploy-to-ec2:
+    needs: build-and-package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Copy JAR to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          source: "deploy/*"
+          target: "/home/ubuntu/app/"
+          overwrite: true
+          strip_components: 0
+          rm: false
+          debug: true
+
+  restart-service:
+    needs: deploy-to-ec2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Restart Backend Service on EC2
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            echo "Stopping service..."
+            sudo systemctl stop servease || true
+
+            echo "Starting service..."
+            sudo systemctl start servease
+
+            echo "Checking status..."
+            sudo systemctl status servease --no-pager
