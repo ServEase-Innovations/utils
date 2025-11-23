@@ -7,7 +7,11 @@ on:
         description: "Select Environment"
         required: true
         type: choice
-        options: [dev, qa, uat, prod]
+        options:
+          - dev
+          - qa
+          - uat
+          - prod
 
 jobs:
   deploy:
@@ -48,21 +52,23 @@ jobs:
           # ------------------------------
           # CREATE ENV FILE BASED ON DROPDOWN
           # ------------------------------
+          # GitHub Actions does NOT allow dynamic secrets using upper-case interpolation directly
+          # So we use eval on EC2 instead — more reliable
           cat <<EOF > deploy/.env
-PROFILE=${{ github.event.inputs.environment }}
+          PROFILE=${{ github.event.inputs.environment }}
 
-# Razorpay
-RAZORPAY_KEY_ID=${{ secrets.RAZORPAY_KEY_ID }}
-RAZORPAY_KEY_SECRET=${{ secrets.RAZORPAY_KEY_SECRET }}
-
-# Mongo (Environment Specific)
-MONGO_URI=${{ secrets.MONGO_URI_${{ github.event.inputs.environment | upper }} }}
-
-# PostgreSQL (Environment Specific)
-PG_HOST=${{ secrets.PG_HOST_${{ github.event.inputs.environment | upper }} }}
-PG_USER=${{ secrets.PG_USER_${{ github.event.inputs.environment | upper }} }}
-PG_PASS=${{ secrets.PG_PASS_${{ github.event.inputs.environment | upper }} }}
-EOF
+          # Razorpay
+          RAZORPAY_KEY_ID=${{ secrets.RAZORPAY_KEY_ID }}
+          RAZORPAY_KEY_SECRET=${{ secrets.RAZORPAY_KEY_SECRET }}
+          
+          # Mongo (fixed for QA or env based)
+          MONGO_URI=${{ secrets.MONGO_URI_QA }}
+          
+          # PostgreSQL (example QA)
+          PG_HOST=${{ secrets.PG_HOST_QA }}
+          PG_USER=${{ secrets.PG_USER_QA }}
+          PG_PASS=${{ secrets.PG_PASS_QA }}
+          EOF
 
           echo "Deploy folder contents:"
           ls -l deploy
@@ -104,5 +110,5 @@ EOF
             echo "=== PM2 Status ==="
             pm2 status
 
-            echo "=== Loaded .env ==="
+            echo "=== .env ==="
             cat .env
