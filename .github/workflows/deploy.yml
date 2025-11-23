@@ -14,44 +14,62 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Select Profile
-        id: select
-        run: |
-          if [ "${{ github.event.inputs.environment }}" = "dev" ]; then
-            echo "profile=dev" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event.inputs.environment }}" = "qa" ]; then
-            echo "profile=qa" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event.inputs.environment }}" = "uat" ]; then
-            echo "profile=uat" >> $GITHUB_OUTPUT
-          elif [ "${{ github.event.inputs.environment }}" = "prod" ]; then
-            echo "profile=prod" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Checkout Code
+      # ------------------------------
+      # CHECKOUT REPOSITORY
+      # ------------------------------
+      - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 1
 
-      - name: Prepare deploy folder (NO .git, clean deploy)
+      # ------------------------------
+      # PREPARE CLEAN DEPLOY FOLDER
+      # ------------------------------
+      - name: Prepare deploy folder
         run: |
           rm -rf deploy
           mkdir deploy
 
-          FILES_TO_COPY="server.js package.json package-lock.json global-bundle.pem global-bundle.p7b"
-          FOLDERS_TO_COPY="controllers models routes services config public views docs"
+          # Copy ONLY required source files
+          cp server.js deploy/
+          cp package.json deploy/
+          cp package-lock.json deploy/
+          cp -r controllers deploy/
+          cp -r models deploy/
+          cp -r routes deploy/
+          cp -r services deploy/
+          cp -r config deploy/
+          cp -r public deploy/
+          cp -r views deploy/
+          cp -r docs deploy/
+          cp global-bundle.pem deploy/ || true
+          cp global-bundle.p7b deploy/ || true
 
-          for f in $FILES_TO_COPY; do
-            if [ -f "$f" ]; then cp "$f" deploy/; fi
-          done
+          # ------------------------------
+          # CREATE ENV FILE BASED ON DROPDOWN
+          # ------------------------------
+          cat <<EOF > deploy/.env
+PROFILE=${{ github.event.inputs.environment }}
 
-          for d in $FOLDERS_TO_COPY; do
-            if [ -d "$d" ]; then cp -r "$d" deploy/; fi
-          done
+# Razorpay
+RAZORPAY_KEY_ID=${{ secrets.RAZORPAY_KEY_ID }}
+RAZORPAY_KEY_SECRET=${{ secrets.RAZORPAY_KEY_SECRET }}
 
-          # Write environment-specific profile
-          echo "PROFILE=${{ steps.select.outputs.profile }}" > deploy/.env
+# Mongo (Environment Specific)
+MONGO_URI=${{ secrets.MONGO_URI_${{ github.event.inputs.environment | upper }} }}
 
-          echo "Prepared deploy folder:"
+# PostgreSQL (Environment Specific)
+PG_HOST=${{ secrets.PG_HOST_${{ github.event.inputs.environment | upper }} }}
+PG_USER=${{ secrets.PG_USER_${{ github.event.inputs.environment | upper }} }}
+PG_PASS=${{ secrets.PG_PASS_${{ github.event.inputs.environment | upper }} }}
+EOF
+
+          echo "Deploy folder contents:"
           ls -l deploy
 
+      # ------------------------------
+      # UPLOAD USING SCP
+      # ------------------------------
       - name: Upload files to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -61,9 +79,11 @@ jobs:
           source: "deploy/*"
           target: "/home/ubuntu/utils/"
           overwrite: true
-          strip_components: 1
           debug: true
 
+      # ------------------------------
+      # SSH & RESTART PM2
+      # ------------------------------
       - name: Restart Node App on EC2
         uses: appleboy/ssh-action@v1.1.0
         with:
@@ -71,8 +91,10 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_KEY }}
           script: |
-            echo "=== Installing Dependencies ==="
+            echo "=== Switching to app directory ==="
             cd /home/ubuntu/utils
+
+            echo "=== Installing Dependencies ==="
             npm install --force
 
             echo "=== Restarting PM2 ==="
@@ -82,5 +104,5 @@ jobs:
             echo "=== PM2 Status ==="
             pm2 status
 
-            echo "=== Current .env File ==="
-            cat /home/ubuntu/utils/.env
+            echo "=== Loaded .env ==="
+            cat .env
