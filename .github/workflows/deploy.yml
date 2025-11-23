@@ -45,12 +45,21 @@ jobs:
           cp -r docs deploy/
           cp global-bundle.pem deploy/ || true
           cp global-bundle.p7b deploy/ || true
-
-          # Copy PM2 ecosystem file
           cp ecosystem.config.js deploy/
 
-          # Write environment variable
-          echo "PROFILE=${{ github.event.inputs.environment }}" > deploy/.env
+          # Copy correct environment config file
+          if [ "${{ github.event.inputs.environment }}" = "qa" ]; then
+              cp .env.qa deploy/.env
+          elif [ "${{ github.event.inputs.environment }}" = "dev" ]; then
+              cp .env.dev deploy/.env
+          elif [ "${{ github.event.inputs.environment }}" = "uat" ]; then
+              cp .env.uat deploy/.env
+          elif [ "${{ github.event.inputs.environment }}" = "prod" ]; then
+              cp .env.prod deploy/.env
+          fi
+
+          echo "Deploy environment file:"
+          cat deploy/.env
 
           echo "Prepared deploy folder:"
           ls -l deploy
