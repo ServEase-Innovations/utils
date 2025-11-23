@@ -14,34 +14,40 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Select Profile
+        id: select
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "dev" ]; then
+            echo "profile=dev" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.inputs.environment }}" = "qa" ]; then
+            echo "profile=qa" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.inputs.environment }}" = "uat" ]; then
+            echo "profile=uat" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.inputs.environment }}" = "prod" ]; then
+            echo "profile=prod" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 1
 
-      - name: Prepare deploy folder (NO .git, NO junk files)
+      - name: Prepare deploy folder (NO .git, clean deploy)
         run: |
           rm -rf deploy
           mkdir deploy
 
-          # copy source files ONLY
-          cp server.js deploy/
-          cp package.json deploy/
-          cp package-lock.json deploy/
-          cp -r controllers deploy/
-          cp -r models deploy/
-          cp -r routes deploy/
-          cp -r services deploy/
-          cp -r config deploy/
-          cp -r public deploy/
-          cp -r views deploy/
-          cp -r docs deploy/
-          cp global-bundle.pem deploy/ || true
-          cp global-bundle.p7b deploy/ || true
+          FILES_TO_COPY="server.js package.json package-lock.json global-bundle.pem global-bundle.p7b"
+          FOLDERS_TO_COPY="controllers models routes services config public views docs"
 
-          # write environment to .env
-          echo "PROFILE=${{ github.event.inputs.environment }}" > deploy/.env
+          for f in $FILES_TO_COPY; do
+            if [ -f "$f" ]; then cp "$f" deploy/; fi
+          done
+
+          for d in $FOLDERS_TO_COPY; do
+            if [ -d "$d" ]; then cp -r "$d" deploy/; fi
+          done
+
+          # Write environment-specific profile
+          echo "PROFILE=${{ steps.select.outputs.profile }}" > deploy/.env
 
           echo "Prepared deploy folder:"
           ls -l deploy
@@ -75,5 +81,5 @@ jobs:
             echo "=== PM2 Status ==="
             pm2 status
 
-            echo "=== .env file ==="
+            echo "=== Current .env File ==="
             cat /home/ubuntu/utils/.env
