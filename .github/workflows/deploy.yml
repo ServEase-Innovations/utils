@@ -118,7 +118,7 @@ jobs:
             npm install --force
 
             echo "=== Restarting PM2 ==="
-            pm2 restart utils || pm2 start server.js --name utils
+            pm2 restart ecosystem.config.js --update-env || pm2 start ecosystem.config.js --update-env
             pm2 save
 
             echo "=== PM2 Status ==="
