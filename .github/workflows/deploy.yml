@@ -70,8 +70,9 @@ jobs:
       run: |
        rm -rf deploy
        mkdir deploy
-       rsync -av --exclude="deploy" --exclude="node_modules" . deploy/
+       rsync -av --exclude="deploy" --exclude="node_modules" ./ deploy/
        echo "PROFILE=${{ steps.select.outputs.profile }}" > deploy/.env
+       echo "Contents of deploy folder:"
        ls -ltr deploy
 
     # ------------------------------
