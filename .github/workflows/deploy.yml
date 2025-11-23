@@ -66,14 +66,22 @@ jobs:
     # ------------------------------
     # Create deploy folder
     # ------------------------------
-    - name: Prepare Deploy Folder
+    - name: Prepare deploy folder
       run: |
-       rm -rf deploy
-       mkdir deploy
-       rsync -av --exclude="deploy" --exclude="node_modules" ./ deploy/
-       echo "PROFILE=${{ steps.select.outputs.profile }}" > deploy/.env
-       echo "Contents of deploy folder:"
-       ls -ltr deploy
+          rm -rf deploy
+          mkdir deploy
+
+          shopt -s dotglob
+          for item in *; do
+            [[ "$item" == "deploy" ]] && continue
+            [[ "$item" == ".git" ]] && continue
+            [[ "$item" == ".github" ]] && continue
+            cp -r "$item" deploy/
+          done
+
+          echo "PROFILE=${{ github.event.inputs.environment }}" > deploy/.env
+          ls -ltr deploy
+
 
     # ------------------------------
     # Copy to EC2
