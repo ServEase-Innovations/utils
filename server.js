@@ -38,7 +38,7 @@ const upload = multer({ storage: storage });
 const { Pool } = require("pg");
 
 const pool = new Pool({
-  host: "13.126.11.184",
+  host: "18.60.51.140",
   port: 5432,
   database: "serveaso",
   user: "serveaso",
@@ -257,7 +257,7 @@ wss.on("connection", (ws) => {
 // Dedicated Postgres client for LISTEN/NOTIFY
 (async () => {
   const pgClient = new Client({
-    host: "13.126.11.184",
+    host: "18.60.51.140",
     port: 5432,
     database: "serveaso",
     user: "serveaso",
@@ -371,7 +371,7 @@ const users = {
   }
 };
 
-mongoose.connect("mongodb://serveaso:serveaso@43.204.100.109:27017/?authSource=admin", {
+mongoose.connect("mongodb://serveaso:serveaso@98.130.50.75:27017/?authSource=admin", {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
