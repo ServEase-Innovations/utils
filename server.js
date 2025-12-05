@@ -29,7 +29,7 @@ const speakeasy = require("speakeasy");
 
 const app = express();
 const appForEmail = express();
-const port = 3000;
+const port = 3001;
 const emailPort = 4000;
 
 const storage = multer.memoryStorage();
@@ -38,7 +38,7 @@ const upload = multer({ storage: storage });
 const { Pool } = require("pg");
 
 const pool = new Pool({
-  host: "18.60.51.140",
+  host: "13.126.11.184",
   port: 5432,
   database: "serveaso",
   user: "serveaso",
@@ -257,7 +257,7 @@ wss.on("connection", (ws) => {
 // Dedicated Postgres client for LISTEN/NOTIFY
 (async () => {
   const pgClient = new Client({
-    host: "18.60.51.140",
+    host: "13.126.11.184",
     port: 5432,
     database: "serveaso",
     user: "serveaso",
@@ -311,58 +311,50 @@ const AUTH0_AUDIENCE = `https://${AUTH0_DOMAIN}/api/v2/`;
 
 
 app.get("/customer/check-email", async (req, res) => {
-  const { email } = req.query;
+  const email = req.query.email?.trim().toLowerCase();
 
   if (!email) {
     return res.status(400).json({ error: "Email query parameter is required" });
   }
 
   try {
-    // Step 1: Check if user exists and get their role
-    const userResult = await pool.query(
-      "SELECT user_role FROM user_credentials WHERE username = $1 LIMIT 1",
+    // 1. Check customer
+    const customerResult = await pool.query(
+      "SELECT customerid AS id FROM customer WHERE LOWER(TRIM(emailid)) = $1 LIMIT 1",
       [email]
     );
 
-    if (userResult.rowCount === 0) {
-      return res.json({ exists: false });
+    if (customerResult.rowCount > 0) {
+      return res.json({
+        exists: true,
+        id: customerResult.rows[0].id,
+        user_role: "CUSTOMER",
+      });
     }
 
-    const userRole = userResult.rows[0].user_role;
+    // 2. Check service provider
+    const spResult = await pool.query(
+      "SELECT serviceproviderid AS id FROM serviceprovider WHERE LOWER(TRIM(emailid)) = $1 LIMIT 1",
+      [email]
+    );
 
-    let idResult;
-    if (userRole === "CUSTOMER") {
-      // Step 2a: Get ID from customer table
-      idResult = await pool.query(
-        "SELECT customerid AS id FROM customer WHERE emailid = $1 LIMIT 1",
-        [email]
-      );
-    } else if (userRole === "SERVICE_PROVIDER") {
-      idResult = await pool.query(
-        "SELECT serviceproviderid AS id FROM serviceprovider WHERE emailid = $1 LIMIT 1",
-        [email]
-      );
-    } else {
-      return res.status(400).json({ error: "Unknown user role" });
+    if (spResult.rowCount > 0) {
+      return res.json({
+        exists: true,
+        id: spResult.rows[0].id,
+        user_role: "SERVICE_PROVIDER",
+      });
     }
 
-    if (idResult.rowCount === 0) {
-      return res.status(404).json({ error: "User record not found in role-specific table" });
-    }
-
-    const userId = idResult.rows[0].id;
-
-    // Step 3: Respond with combined data
-    return res.json({
-      id: userId,
-      user_role: userRole,
-    });
+    // 3. Not found
+    return res.json({ exists: false });
 
   } catch (err) {
     console.error("❌ Error checking customer email:", err);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
 
 const users = {
   admin: {
