@@ -1,0 +1,32 @@
+const dotenv = require("dotenv");
+const path = require("path");
+const fs = require("fs");
+
+const ENV = process.env.NODE_ENV || "development";
+
+// EC2 will always have only `.env` because GitHub writes it.
+// Local will load `.env.<env>` if available.
+let envPath = path.resolve(process.cwd(), `.env.${ENV}`);
+
+// If env file does not exist (EC2), fallback to `.env`
+if (!fs.existsSync(envPath)) {
+  envPath = path.resolve(process.cwd(), ".env");
+}
+
+dotenv.config({ path: envPath });
+
+console.log("✔ Loaded env file:", envPath);
+
+module.exports = {
+  env: ENV,
+  postgres: {
+    host: process.env.POSTGRES_HOST || "127.0.0.1",
+    user: process.env.POSTGRES_USER,
+    password: process.env.POSTGRES_PASSWORD,
+    database: process.env.POSTGRES_DB,
+    port: process.env.POSTGRES_PORT || 5432,
+  },
+  mongo: {
+    uri: process.env.MONGO_URI,
+  },
+};

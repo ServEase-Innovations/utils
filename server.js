@@ -25,6 +25,8 @@ const User = require("./models/User");
 const bcrypt = require("bcrypt");
 const QRCode = require("qrcode");
 const speakeasy = require("speakeasy");
+const config = require("./config/config.js");
+
 
 
 const app = express();
@@ -38,11 +40,11 @@ const upload = multer({ storage: storage });
 const { Pool } = require("pg");
 
 const pool = new Pool({
-  host: "13.126.11.184",
-  port: 5432,
-  database: "serveaso",
-  user: "serveaso",
-  password: "serveaso",
+  host: config.postgres.host,
+  user: config.postgres.user,
+  password: config.postgres.password,
+  database: config.postgres.database,
+  port: config.postgres.port,
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
@@ -257,11 +259,11 @@ wss.on("connection", (ws) => {
 // Dedicated Postgres client for LISTEN/NOTIFY
 (async () => {
   const pgClient = new Client({
-    host: "13.126.11.184",
-    port: 5432,
-    database: "serveaso",
-    user: "serveaso",
-    password: "serveaso",
+    host: config.postgres.host,
+  user: config.postgres.user,
+  password: config.postgres.password,
+  database: config.postgres.database,
+  port: config.postgres.port,
   });
 
   await pgClient.connect();
