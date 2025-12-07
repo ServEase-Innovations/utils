@@ -34,7 +34,7 @@ jobs:
           if [[ "$BRANCH" == "dev" ]]; then
             echo "host=${{ secrets.DEV_HOST }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ secrets.DEV_USER }}" >> $GITHUB_OUTPUT
-            echo "path=/home/ubuntu/payments" >> $GITHUB_OUTPUT
+            echo "path=/home/ubuntu/utils" >> $GITHUB_OUTPUT
             echo "env_content<<EOF" >> $GITHUB_OUTPUT
             echo "${{ secrets.DEV_ENV_FILE }}" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
@@ -43,7 +43,7 @@ jobs:
           elif [[ "$BRANCH" == "qa" ]]; then
             echo "host=${{ secrets.QA_HOST }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ secrets.QA_USER }}" >> $GITHUB_OUTPUT
-            echo "path=/home/ubuntu/payments" >> $GITHUB_OUTPUT
+            echo "path=/home/ubuntu/utils" >> $GITHUB_OUTPUT
             echo "env_content<<EOF" >> $GITHUB_OUTPUT
             echo "${{ secrets.QA_ENV_FILE }}" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
@@ -52,7 +52,7 @@ jobs:
           else
             echo "host=${{ secrets.PROD_HOST }}" >> $GITHUB_OUTPUT
             echo "ssh_user=${{ secrets.PROD_USER }}" >> $GITHUB_OUTPUT
-            echo "path=/home/ubuntu/payments" >> $GITHUB_OUTPUT
+            echo "path=/home/ubuntu/utils" >> $GITHUB_OUTPUT
             echo "env_content<<EOF" >> $GITHUB_OUTPUT
             echo "${{ secrets.PROD_ENV_FILE }}" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
@@ -74,13 +74,13 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no \
           ${{ steps.env.outputs.ssh_user }}@${{ steps.env.outputs.host }} \
-          "echo '${{ steps.env.outputs.env_content }}' > /home/ubuntu/payments/.env"
+          "echo '${{ steps.env.outputs.env_content }}' > /home/ubuntu/utils/.env"
 
       - name: 🚀 Install & Restart on EC2
         run: |
           ssh -o StrictHostKeyChecking=no \
           ${{ steps.env.outputs.ssh_user }}@${{ steps.env.outputs.host }} \
-          "cd /home/ubuntu/payments && \
+          "cd /home/ubuntu/utils && \
            npm install --legacy-peer-deps && \
-           pm2 startOrReload ecosystem.config.js --only payments && \
+           pm2 startOrReload ecosystem.config.js --only utils && \
            pm2 save"
