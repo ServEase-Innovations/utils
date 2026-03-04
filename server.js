@@ -322,9 +322,12 @@ app.get("/customer/check-email", async (req, res) => {
   try {
     // 1. Check customer
     const customerResult = await pool.query(
-      "SELECT customerid AS id FROM customer WHERE LOWER(TRIM(emailid)) = $1 LIMIT 1",
-      [email]
-    );
+  `SELECT "customerid" AS id
+   FROM customer
+   WHERE LOWER(TRIM("emailid")) = $1
+   LIMIT 1`,
+  [email]
+);
 
     if (customerResult.rowCount > 0) {
       return res.json({
@@ -334,11 +337,16 @@ app.get("/customer/check-email", async (req, res) => {
       });
     }
 
+    console.log(`No customer found with email: ${email.trim().toLowerCase()}`);
+
     // 2. Check service provider
     const spResult = await pool.query(
-      "SELECT serviceproviderid AS id FROM serviceprovider WHERE LOWER(TRIM(emailId)) = $1 LIMIT 1",
-      [email]
-    );
+  `SELECT "serviceproviderid" AS id
+   FROM serviceprovider
+   WHERE LOWER(TRIM("emailId")) = $1
+   LIMIT 1`,
+  [email]
+);
 
     if (spResult.rowCount > 0) {
       return res.json({
