@@ -336,7 +336,7 @@ app.get("/customer/check-email", async (req, res) => {
 
     // 2. Check service provider
     const spResult = await pool.query(
-      "SELECT serviceproviderid AS id FROM serviceprovider WHERE LOWER(TRIM(emailid)) = $1 LIMIT 1",
+      "SELECT serviceproviderid AS id FROM serviceprovider WHERE LOWER(TRIM(emailId)) = $1 LIMIT 1",
       [email]
     );
 
@@ -368,6 +368,40 @@ const users = {
 mongoose.connect("mongodb://serveaso:serveaso@98.130.50.75:27017/?authSource=admin", {
   useNewUrlParser: true,
   useUnifiedTopology: true,
+});
+
+app.post("/api/reset-password", async (req, res) => {
+  const { username, token, newPassword } = req.body;
+
+  if (!username || !token || !newPassword) {
+    return res.status(400).json({ message: "Missing required fields" });
+  }
+
+  const hashedToken = crypto
+    .createHash("sha256")
+    .update(token)
+    .digest("hex");
+
+  const user = await User.findOne({
+    username,
+    resetPasswordToken: hashedToken,
+    resetPasswordExpires: { $gt: Date.now() },
+  });
+
+  if (!user) {
+    return res.status(400).json({ message: "Invalid or expired token" });
+  }
+
+  // Hash new password
+  user.hashedPassword = await bcrypt.hash(newPassword, 10);
+
+  // Clear reset fields
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpires = undefined;
+
+  await user.save();
+
+  res.json({ message: "Password reset successful" });
 });
 
 
