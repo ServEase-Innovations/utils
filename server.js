@@ -356,6 +356,21 @@ app.get("/customer/check-email", async (req, res) => {
       });
     }
 
+    const vendorResult = await pool.query(
+  `SELECT "vendorid" AS id
+   FROM vendor
+   WHERE LOWER(TRIM("emailid")) = $1
+   LIMIT 1`,
+  [email]
+);
+if (vendorResult.rowCount > 0) {
+      return res.json({
+        exists: true,
+        id: vendorResult.rows[0].id,
+        user_role: "VENDOR",
+      });
+    }
+
     // 3. Not found
     return res.json({ exists: false });
 
