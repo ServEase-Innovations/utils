@@ -31,8 +31,9 @@ const config = require("./config/config.js");
 
 const app = express();
 const appForEmail = express();
-const port = 3001;
-const emailPort = 4000;
+// Defaults avoid clashes with other monorepo services (preferences:3001, providers:4000, etc.)
+const port = Number(process.env.PORT) || 3030;
+const emailPort = Number(process.env.UTILS_EMAIL_PORT) || 4030;
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
@@ -70,10 +71,12 @@ app.get('/api/protected', checkJwt, (req, res) => {
   res.json({ message: 'Hello from a protected endpoint!', user: req.auth });
 });
 
-const razorpay = new Razorpay({
-  key_id: "rzp_test_lTdgjtSRlEwreA",
-  key_secret: "g15WB8CEwaYBQ5FqpIKKMdNS",
-});
+const razorpayKeyId = process.env.RAZORPAY_KEY_ID;
+const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET;
+const razorpay =
+  razorpayKeyId && razorpayKeySecret
+    ? new Razorpay({ key_id: razorpayKeyId, key_secret: razorpayKeySecret })
+    : null;
 
 // Middleware
 app.use(cors());
@@ -164,10 +167,10 @@ app.delete('/delete-all', deleteAll);
 const server = http.createServer(app);
 
 server.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+  console.log(`Utils main server (HTTP + WebSocket): http://localhost:${port}`);
 });
 
-// Middleware for the email app (port 4000)
+// Secondary HTTP app (email send routes); scale out separately in production if needed
 appForEmail.use(cors());
 appForEmail.use(bodyParser.json());
 appForEmail.use(express.json());
@@ -180,6 +183,12 @@ appForEmail.use('/send-booking-email', bookemailRoutes);
 // Endpoint to create an order
 app.post('/create-order', async (req, res) => {
   try {
+    if (!razorpay) {
+      return res.status(503).json({
+        success: false,
+        message: 'Razorpay is not configured; set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET',
+      });
+    }
     const { amount } = req.body; // Get amount from the frontend (in paise, e.g., 10000 for ₹100)
 
     const options = {
@@ -201,10 +210,9 @@ app.post('/create-order', async (req, res) => {
   }
 });
 
-// Start the email server (port 4000)
 const emailServer = http.createServer(appForEmail);
 emailServer.listen(emailPort, () => {
-  console.log(`Email server is running on http://localhost:${emailPort}`);
+  console.log(`Utils email HTTP app: http://localhost:${emailPort}`);
 });
 
 

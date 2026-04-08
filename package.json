@@ -1,10 +1,11 @@
 {
-  "name": "servease_email",
+  "name": "serveaso-utils",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Shared utilities: email, uploads, admin/Mongo helpers, WebSockets (see server.js)",
+  "main": "server.js",
   "scripts": {
     "dev": "NODE_ENV=development nodemon server.js",
+    "start": "NODE_ENV=production node server.js",
     "qa": "NODE_ENV=qa node server.js",
     "prod": "NODE_ENV=production node server.js"
   },
@@ -31,7 +32,6 @@
     "pg": "^8.13.1",
     "qrcode": "^1.5.4",
     "razorpay": "^2.9.5",
-    "servease_email": "file:",
     "smtp-server": "^3.13.6",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
