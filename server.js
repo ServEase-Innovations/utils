@@ -26,8 +26,9 @@ const bcrypt = require("bcrypt");
 const QRCode = require("qrcode");
 const speakeasy = require("speakeasy");
 const config = require("./config/config.js");
-
-
+const { logger } = require("./logger");
+const requestMetrics = require("./monitoring/requestMetrics");
+const { getMetrics, metricsContentType } = require("./monitoring/prometheus");
 
 const app = express();
 const appForEmail = express();
@@ -80,6 +81,7 @@ const razorpay =
 
 // Middleware
 app.use(cors());
+app.use(requestMetrics);
 app.use(bodyParser.json());
 app.use(express.json());
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
@@ -163,15 +165,26 @@ app.delete('/records/:id', deleteRecord);
 app.post('/upload', upload.single('file'), uploadExcel);
 app.delete('/delete-all', deleteAll);
 
+app.get("/metrics", async (req, res, next) => {
+  try {
+    res.set("Content-Type", metricsContentType);
+    res.end(await getMetrics());
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ✅ Create an HTTP server and use it for both Express and WebSocket
 const server = http.createServer(app);
 
 server.listen(port, () => {
+  logger.info("utils_main_server_started", { port, metrics: "/metrics" });
   console.log(`Utils main server (HTTP + WebSocket): http://localhost:${port}`);
 });
 
 // Secondary HTTP app (email send routes); scale out separately in production if needed
 appForEmail.use(cors());
+appForEmail.use(requestMetrics);
 appForEmail.use(bodyParser.json());
 appForEmail.use(express.json());
 appForEmail.use(express.urlencoded({ extended: true }));
@@ -212,6 +225,7 @@ app.post('/create-order', async (req, res) => {
 
 const emailServer = http.createServer(appForEmail);
 emailServer.listen(emailPort, () => {
+  logger.info("utils_email_server_started", { port: emailPort });
   console.log(`Utils email HTTP app: http://localhost:${emailPort}`);
 });
 

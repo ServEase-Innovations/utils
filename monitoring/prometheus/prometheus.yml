@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: utils-app
+    metrics_path: /metrics
+    static_configs:
+      # Main HTTP + WebSocket server (monorepo default PORT=3030)
+      - targets: ["host.docker.internal:3030"]
