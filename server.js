@@ -5,7 +5,8 @@ const swaggerUi = require('swagger-ui-express');
 const { swaggerSpec } = require('./docs/swaggerDocs');
 const { Server } = require('ws');
 const { Client } = require('pg');
-const { getRecords, getRecordById, addRecord, updateRecord, uploadExcel, deleteAll, deleteRecord , getUserSettingsRecords , getUserSettingsById , addSettings , deleteUserPreferenceRecord ,updateUserSettings , deleteUserSettings , deleteAlUserPreference , createAuth0User  , deleteAdmin , updateAdmin , getAllAdmins} = require('./controllers/mongoDBControllers');
+const { getRecords, getRecordById, addRecord, updateRecord, uploadExcel, deleteAll, deleteRecord , getUserSettingsRecords , getUserSettingsById , addSettings , deleteUserPreferenceRecord ,updateUserSettings , deleteUserSettings , deleteAlUserPreference , createAuth0User  , deleteAdmin , updateAdmin , getAllAdmins, getPlatformSettings, upsertPlatformSettings, pingMongoForStatus} = require('./controllers/mongoDBControllers');
+const axios = require('axios');
 const emailRoutes = require('./routes/emailRoutes');
 const bookemailRoutes = require('./routes/bookingemailRoutes');
 const rescheduleEmailRoutes = require('./routes/rescheduleEmailRoutes');
@@ -172,6 +173,164 @@ app.get("/metrics", async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// --- Admin platform settings (ServEase Settings UI) ---
+app.get("/api/platform-settings", async (req, res) => {
+  try {
+    const settings = await getPlatformSettings();
+    res.json({ success: true, settings });
+  } catch (err) {
+    console.error("GET /api/platform-settings:", err);
+    res.status(500).json({ success: false, error: err?.message || "Failed to load settings" });
+  }
+});
+
+app.put("/api/platform-settings", async (req, res) => {
+  try {
+    const settings = await upsertPlatformSettings(req.body);
+    res.json({ success: true, settings });
+  } catch (err) {
+    console.error("PUT /api/platform-settings:", err);
+    res.status(500).json({ success: false, error: err?.message || "Failed to save settings" });
+  }
+});
+
+/**
+ * GET remote monorepo service — tries common health/docs paths.
+ * @param {string} id
+ * @param {string} label
+ * @param {string} baseUrl
+ * @param {string[]} [pathCandidates]
+ */
+async function probeHttpService(id, label, baseUrl, pathCandidates) {
+  const candidates = pathCandidates && pathCandidates.length
+    ? pathCandidates
+    : ["/health", "/metrics", "/api-docs", "/_whoami", "/"];
+  const b = (baseUrl || "").trim().replace(/\/$/, "");
+  if (!b) {
+    return { id, label, status: "skipped", detail: "Set service URL in env to probe" };
+  }
+  let lastDetail = "unreachable";
+  for (const p of candidates) {
+    try {
+      const r = await axios.get(`${b}${p}`, { timeout: 4500, validateStatus: () => true, maxRedirects: 2 });
+      if (r.status >= 200 && r.status < 500) {
+        return {
+          id,
+          label,
+          status: r.status < 400 ? "ok" : "degraded",
+          detail: `${p} → HTTP ${r.status}`,
+        };
+      }
+      lastDetail = `${p} → HTTP ${r.status}`;
+    } catch (e) {
+      lastDetail = e.code || e.message || "error";
+    }
+  }
+  return { id, label, status: "error", detail: String(lastDetail) };
+}
+
+app.get("/api/platform-status", async (req, res) => {
+  const env = process.env.NODE_ENV || "development";
+  const payBase = (process.env.PAYMENTS_SERVICE_URL || "http://127.0.0.1:4100").replace(/\/$/, "");
+  const providersBase = (process.env.PROVIDERS_SERVICE_URL || "http://127.0.0.1:4000").replace(/\/$/, "");
+  const preferencesBase = (process.env.PREFERENCES_SERVICE_URL || "http://127.0.0.1:3001").replace(/\/$/, "");
+  const couponsBase = (process.env.COUPONS_SERVICE_URL || "http://127.0.0.1:3002").replace(/\/$/, "");
+  const reviewsBase = (process.env.REVIEWS_SERVICE_URL || "http://127.0.0.1:5005").replace(/\/$/, "");
+  const chatBase = (process.env.CHAT_SERVICE_URL || "http://127.0.0.1:5000").replace(/\/$/, "");
+  const notificationsBase = (process.env.NOTIFICATIONS_SERVICE_URL || "").trim().replace(/\/$/, "");
+  const packages = (() => {
+    try {
+      // eslint-disable-next-line import/no-dynamic-require, global-require
+      return require("./package.json");
+    } catch {
+      return { version: "1.0.0" };
+    }
+  })();
+
+  const services = [];
+
+  services.push({
+    id: "utils",
+    label: "Utils API (this process)",
+    status: "ok",
+    detail: `this process, port ${port}`,
+  });
+
+  try {
+    await pool.query("SELECT 1");
+    services.push({ id: "postgres", label: "PostgreSQL", status: "ok", detail: "query ok" });
+  } catch (e) {
+    services.push({ id: "postgres", label: "PostgreSQL", status: "error", detail: e?.message || "unreachable" });
+  }
+
+  const mongo = await pingMongoForStatus();
+  services.push({
+    id: "mongo",
+    label: "MongoDB (catalog & settings)",
+    status: mongo.ok ? "ok" : "error",
+    detail: mongo.message,
+  });
+
+  const [
+    paymentsH,
+    providersH,
+    preferencesH,
+    couponsH,
+    reviewsH,
+    chatH,
+  ] = await Promise.all([
+    probeHttpService("payments", "Payments API", payBase, ["/health", "/metrics", "/"]),
+    probeHttpService("providers", "Providers API", providersBase, ["/api-docs", "/api-docs/", "/health", "/"]),
+    probeHttpService("preferences", "Preferences API", preferencesBase, ["/health", "/metrics", "/_whoami", "/"]),
+    probeHttpService("coupons", "Coupons API", couponsBase, ["/health", "/metrics", "/"]),
+    probeHttpService("reviews", "Reviews API", reviewsBase, ["/health", "/metrics", "/api-docs", "/"]),
+    probeHttpService("chat", "Chat / support API", chatBase, ["/health", "/api-docs", "/metrics", "/"]),
+  ]);
+  services.push(paymentsH, providersH, preferencesH, couponsH, reviewsH, chatH);
+
+  if (notificationsBase) {
+    services.push(
+      await probeHttpService("notifications", "Notifications API", notificationsBase, ["/health", "/metrics", "/"])
+    );
+  } else {
+    services.push({
+      id: "notifications",
+      label: "Notifications API",
+      status: "skipped",
+      detail: "set NOTIFICATIONS_SERVICE_URL to probe (optional)",
+    });
+  }
+
+  const hasEmail = Boolean(
+    process.env.SENDGRID_API_KEY ||
+      (process.env.SMTP_HOST && process.env.SMTP_PORT) ||
+      process.env.AWS_SES_REGION
+  );
+  services.push({
+    id: "email",
+    label: "Email (outbound, utils)",
+    status: hasEmail ? "ok" : "limited",
+    detail: hasEmail ? "SMTP / Sendgrid / SES configured" : "not configured in utils env",
+  });
+
+  res.json({
+    success: true,
+    environment: env,
+    appVersion: packages.version || "1.0.0",
+    service: "utils",
+    serviceUrls: {
+      payments: payBase || null,
+      providers: providersBase || null,
+      preferences: preferencesBase || null,
+      coupons: couponsBase || null,
+      reviews: reviewsBase || null,
+      chat: chatBase || null,
+      notifications: notificationsBase || null,
+    },
+    services,
+  });
 });
 
 // ✅ Create an HTTP server and use it for both Express and WebSocket

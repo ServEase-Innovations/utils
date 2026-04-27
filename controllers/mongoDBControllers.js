@@ -987,6 +987,196 @@ const createAuth0User = async (req, res) => {
 
 
 
+// --- Platform settings (admin Settings page) — single document in MongoDB ---
+const PLATFORM_SETTINGS_COLLECTION = "Servease_platform_settings";
+const PLATFORM_DOC_ID = "platform";
+
+const DEFAULT_PLATFORM_SETTINGS = {
+  platformName: "ServEase",
+  supportEmail: "",
+  platformDescription: "Connect customers with trusted service providers",
+  features: {
+    userRegistration: true,
+    providerVerification: true,
+    autoApproveRequests: false,
+  },
+  notifications: {
+    emailNotifications: true,
+    newUserAlerts: true,
+    paymentFailureAlerts: true,
+    maintenanceNotifications: false,
+  },
+  security: {
+    twoFactorRequired: false,
+    passwordComplexity: true,
+    sessionTimeout: true,
+    sessionDurationMinutes: 30,
+  },
+};
+
+function deepMergePlatform(target, source) {
+  if (!source || typeof source !== "object") {
+    return target;
+  }
+  const out = { ...target };
+  for (const k of Object.keys(source)) {
+    if (
+      source[k] !== null &&
+      typeof source[k] === "object" &&
+      !Array.isArray(source[k]) &&
+      out[k] !== null &&
+      typeof out[k] === "object" &&
+      !Array.isArray(out[k])
+    ) {
+      out[k] = deepMergePlatform(out[k], source[k]);
+    } else if (source[k] !== undefined) {
+      out[k] = source[k];
+    }
+  }
+  return out;
+}
+
+function cloneDefaults() {
+  return JSON.parse(JSON.stringify(DEFAULT_PLATFORM_SETTINGS));
+}
+
+function sanitizeString(v, maxLen) {
+  if (typeof v !== "string") {
+    return undefined;
+  }
+  const t = v.trim();
+  if (!t) {
+    return "";
+  }
+  return t.length > maxLen ? t.slice(0, maxLen) : t;
+}
+
+function sanitizeBool(v, fallback) {
+  if (typeof v === "boolean") {
+    return v;
+  }
+  if (v === "true" || v === 1) {
+    return true;
+  }
+  if (v === "false" || v === 0) {
+    return false;
+  }
+  return fallback;
+}
+
+function sanitizeInt(v, min, max, fallback) {
+  const n = parseInt(String(v), 10);
+  if (!Number.isFinite(n)) {
+    return fallback;
+  }
+  return Math.min(max, Math.max(min, n));
+}
+
+function sanitizePlatformBody(body) {
+  const b = body && typeof body === "object" ? body : {};
+  const f = b.features && typeof b.features === "object" ? b.features : {};
+  const n = b.notifications && typeof b.notifications === "object" ? b.notifications : {};
+  const s = b.security && typeof b.security === "object" ? b.security : {};
+  return {
+    platformName: sanitizeString(b.platformName, 200) ?? DEFAULT_PLATFORM_SETTINGS.platformName,
+    supportEmail: sanitizeString(b.supportEmail, 200) ?? DEFAULT_PLATFORM_SETTINGS.supportEmail,
+    platformDescription: sanitizeString(b.platformDescription, 2000) ?? DEFAULT_PLATFORM_SETTINGS.platformDescription,
+    features: {
+      userRegistration: sanitizeBool(f.userRegistration, DEFAULT_PLATFORM_SETTINGS.features.userRegistration),
+      providerVerification: sanitizeBool(f.providerVerification, DEFAULT_PLATFORM_SETTINGS.features.providerVerification),
+      autoApproveRequests: sanitizeBool(f.autoApproveRequests, DEFAULT_PLATFORM_SETTINGS.features.autoApproveRequests),
+    },
+    notifications: {
+      emailNotifications: sanitizeBool(
+        n.emailNotifications,
+        DEFAULT_PLATFORM_SETTINGS.notifications.emailNotifications
+      ),
+      newUserAlerts: sanitizeBool(n.newUserAlerts, DEFAULT_PLATFORM_SETTINGS.notifications.newUserAlerts),
+      paymentFailureAlerts: sanitizeBool(
+        n.paymentFailureAlerts,
+        DEFAULT_PLATFORM_SETTINGS.notifications.paymentFailureAlerts
+      ),
+      maintenanceNotifications: sanitizeBool(
+        n.maintenanceNotifications,
+        DEFAULT_PLATFORM_SETTINGS.notifications.maintenanceNotifications
+      ),
+    },
+    security: {
+      twoFactorRequired: sanitizeBool(s.twoFactorRequired, DEFAULT_PLATFORM_SETTINGS.security.twoFactorRequired),
+      passwordComplexity: sanitizeBool(s.passwordComplexity, DEFAULT_PLATFORM_SETTINGS.security.passwordComplexity),
+      sessionTimeout: sanitizeBool(s.sessionTimeout, DEFAULT_PLATFORM_SETTINGS.security.sessionTimeout),
+      sessionDurationMinutes: sanitizeInt(
+        s.sessionDurationMinutes,
+        5,
+        10080,
+        DEFAULT_PLATFORM_SETTINGS.security.sessionDurationMinutes
+      ),
+    },
+  };
+}
+
+async function getPlatformSettings() {
+  const { db, client } = await connectToDB();
+  try {
+    const col = db.collection(PLATFORM_SETTINGS_COLLECTION);
+    const doc = await col.findOne({ _id: PLATFORM_DOC_ID });
+    const base = cloneDefaults();
+    if (!doc) {
+      return { ...base, updatedAt: null, source: "defaults" };
+    }
+    const { _id, updatedAt: at, ...dataFields } = doc;
+    const merged = deepMergePlatform(base, dataFields);
+    merged.updatedAt = at instanceof Date ? at.toISOString() : null;
+    merged.source = "database";
+    return merged;
+  } catch (e) {
+    console.error("getPlatformSettings error:", e);
+    const fallback = cloneDefaults();
+    fallback.updatedAt = null;
+    fallback.source = "defaults";
+    return fallback;
+  } finally {
+    await client.close();
+  }
+}
+
+async function upsertPlatformSettings(body) {
+  const { db, client } = await connectToDB();
+  const sanitized = sanitizePlatformBody(body);
+  const now = new Date();
+  const toStore = { ...sanitized, updatedAt: now };
+  try {
+    const col = db.collection(PLATFORM_SETTINGS_COLLECTION);
+    await col.replaceOne(
+      { _id: PLATFORM_DOC_ID },
+      { _id: PLATFORM_DOC_ID, ...toStore, updatedAt: now },
+      { upsert: true }
+    );
+    return {
+      ...sanitized,
+      features: { ...sanitized.features },
+      notifications: { ...sanitized.notifications },
+      security: { ...sanitized.security },
+      updatedAt: now.toISOString(),
+      source: "database",
+    };
+  } finally {
+    await client.close();
+  }
+}
+
+async function pingMongoForStatus() {
+  const { db, client } = await connectToDB();
+  try {
+    await db.command({ ping: 1 });
+    return { ok: true, message: "Connected" };
+  } catch (e) {
+    return { ok: false, message: e?.message || "unreachable" };
+  } finally {
+    await client.close();
+  }
+}
+
 module.exports = {
   getRecords,
   getRecordById,
@@ -1005,5 +1195,8 @@ module.exports = {
   createAuth0User,
   deleteAdmin, 
   updateAdmin,
-  getAllAdmins
+  getAllAdmins,
+  getPlatformSettings,
+  upsertPlatformSettings,
+  pingMongoForStatus,
 };
