@@ -524,7 +524,7 @@ app.get("/customer/check-email", async (req, res) => {
     const spResult = await pool.query(
   `SELECT "serviceproviderid" AS id
    FROM serviceprovider
-   WHERE LOWER(TRIM("emailId")) = $1
+   WHERE LOWER(TRIM("emailid")) = $1
    LIMIT 1`,
   [email]
 );
