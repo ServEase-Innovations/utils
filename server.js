@@ -1,3 +1,9 @@
+// Load .env.development / .env before any route reads process.env
+require("./config/config.js");
+
+const { initFirebaseAdmin } = require("./services/fcm.service");
+initFirebaseAdmin();
+
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -12,12 +18,12 @@ const bookemailRoutes = require('./routes/bookingemailRoutes');
 const rescheduleEmailRoutes = require('./routes/rescheduleEmailRoutes');
 const cancelEmailRoutes = require('./routes/cancelEmailRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
+const pushRoutes = require('./routes/pushRoutes');
 const { connectToDB } = require('./controllers/mongoDBControllers');
 const multer = require('multer');
 const xlsx = require('xlsx');
 const Razorpay = require('razorpay');
 const http = require('http'); 
-require('dotenv').config();
 const { ObjectId } = require('mongodb');
 const { expressjwt: jwt } = require('express-jwt');
 const jwksRsa = require('jwks-rsa');
@@ -89,6 +95,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 app.use('/send-email', emailRoutes);
+app.use('/api/push', pushRoutes);
 app.get('/records', async (req, res) => {
   const records = await getRecords();
   res.json(records);

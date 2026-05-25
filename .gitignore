@@ -1,3 +1,5 @@
 node_modules/
 .env
 logs/
+firebase-service-account.json
+secrets/
