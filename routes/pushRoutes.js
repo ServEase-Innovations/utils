@@ -6,13 +6,37 @@ const { adminPushAuth } = require("../middleware/adminPushAuth");
 
 const router = express.Router();
 
+const TOKEN_SELECT = "token email deviceName platform lastSeenAt";
+
+/** One push per user email (latest device); avoids duplicate notifications from stale tokens. */
+function pickUniqueTokensForSend(rows) {
+  const sorted = [...rows].sort(
+    (a, b) => new Date(b.lastSeenAt || 0) - new Date(a.lastSeenAt || 0)
+  );
+  const seenEmails = new Set();
+  const seenTokens = new Set();
+  const tokens = [];
+  for (const row of sorted) {
+    const t = row.token;
+    if (!t || seenTokens.has(t)) continue;
+    if (row.email) {
+      const email = String(row.email).toLowerCase();
+      if (seenEmails.has(email)) continue;
+      seenEmails.add(email);
+    }
+    seenTokens.add(t);
+    tokens.push(t);
+  }
+  return tokens;
+}
+
 function resolveTokensForSend({ target, role, platform, deviceIds, emails, explicitTokens }) {
   if (target === "tokens" && Array.isArray(explicitTokens)) {
     return DeviceToken.find({
       token: { $in: explicitTokens.map(String).filter(Boolean) },
       disabled: { $ne: true },
     })
-      .select("token email deviceName platform")
+      .select(TOKEN_SELECT)
       .lean();
   }
 
@@ -24,7 +48,7 @@ function resolveTokensForSend({ target, role, platform, deviceIds, emails, expli
       _id: { $in: ids },
       disabled: { $ne: true },
     })
-      .select("token email deviceName platform")
+      .select(TOKEN_SELECT)
       .lean();
   }
 
@@ -38,14 +62,14 @@ function resolveTokensForSend({ target, role, platform, deviceIds, emails, expli
       email: { $in: normalized },
       disabled: { $ne: true },
     })
-      .select("token email deviceName platform")
+      .select(TOKEN_SELECT)
       .lean();
   }
 
   const query = { disabled: { $ne: true } };
   if (role) query.role = String(role).toUpperCase();
   if (platform) query.platform = String(platform);
-  return DeviceToken.find(query).select("token email deviceName platform").lean();
+  return DeviceToken.find(query).select(TOKEN_SELECT).lean();
 }
 
 /** Register or refresh an FCM device token (mobile app). */
@@ -70,13 +94,30 @@ router.post("/register", async (req, res) => {
       });
     }
 
+    const normalizedEmail = email ? String(email).trim().toLowerCase() : undefined;
+    const platformNorm = ["ios", "android", "web"].includes(platform)
+      ? platform
+      : "ios";
+
+    if (normalizedEmail) {
+      await DeviceToken.updateMany(
+        {
+          email: normalizedEmail,
+          platform: platformNorm,
+          token: { $ne: trimmedToken },
+          disabled: { $ne: true },
+        },
+        { $set: { disabled: true } }
+      );
+    }
+
     const doc = await DeviceToken.findOneAndUpdate(
       { token: trimmedToken },
       {
         token: trimmedToken,
-        platform: ["ios", "android", "web"].includes(platform) ? platform : "ios",
+        platform: platformNorm,
         userId: userId != null ? String(userId) : undefined,
-        email: email ? String(email).trim().toLowerCase() : undefined,
+        email: normalizedEmail,
         role: role ? String(role).toUpperCase() : undefined,
         serviceProviderId:
           serviceProviderId != null ? String(serviceProviderId) : undefined,
@@ -128,7 +169,10 @@ router.post("/send", adminPushAuth, async (req, res) => {
       emails,
       explicitTokens,
     });
-    const tokens = rows.map((r) => r.token).filter(Boolean);
+    const tokens =
+      target === "devices" && Array.isArray(deviceIds) && deviceIds.length
+        ? rows.map((r) => r.token).filter(Boolean)
+        : pickUniqueTokensForSend(rows);
 
     if (!tokens.length) {
       return res.status(400).json({

@@ -141,11 +141,13 @@ async function sendToTokens({ title, body, tokens, data = {} }) {
     },
     android: {
       priority: "high",
+      collapseKey: "serveaso_admin",
       notification: {
         channelId: "serveaso_default",
         sound: "default",
         icon: "ic_stat_serveaso",
         color: "#0B7DD9",
+        tag: "serveaso_push",
       },
     },
   };
