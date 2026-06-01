@@ -24,7 +24,7 @@ const client = new Client({
 
 client.connect()
   .then(() => {
-    console.log('Listening for serviceprovider_engagement insert notifications...');
+    console.log('Listening for engagement_insert notifications...');
     // Listen to the 'serviceprovider_engagement_insert' channel
     client.query('LISTEN engagement_insert');
 
