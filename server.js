@@ -508,38 +508,49 @@ app.get("/customer/check-email", async (req, res) => {
   }
 
   try {
-    // 1. Check customer
     const customerResult = await pool.query(
-  `SELECT "customerid" AS id
-   FROM customer
-   WHERE LOWER(TRIM("emailid")) = $1
-   LIMIT 1`,
-  [email]
-);
+      `SELECT "customerid" AS id
+       FROM customer
+       WHERE LOWER(TRIM("emailid")) = $1
+       LIMIT 1`,
+      [email]
+    );
 
-    if (customerResult.rowCount > 0) {
+    const spResult = await pool.query(
+      `SELECT "serviceproviderid" AS id
+       FROM serviceprovider
+       WHERE LOWER(TRIM("emailid")) = $1
+       LIMIT 1`,
+      [email]
+    );
+
+    const customerId =
+      customerResult.rowCount > 0 ? customerResult.rows[0].id : null;
+    const serviceProviderId =
+      spResult.rowCount > 0 ? spResult.rows[0].id : null;
+
+    if (customerId != null && serviceProviderId != null) {
       return res.json({
         exists: true,
-        id: customerResult.rows[0].id,
+        id: customerId,
+        user_role: "CUSTOMER",
+        service_provider_id: serviceProviderId,
+        dual_role: true,
+      });
+    }
+
+    if (customerId != null) {
+      return res.json({
+        exists: true,
+        id: customerId,
         user_role: "CUSTOMER",
       });
     }
 
-    console.log(`No customer found with email: ${email.trim().toLowerCase()}`);
-
-    // 2. Check service provider
-    const spResult = await pool.query(
-  `SELECT "serviceproviderid" AS id
-   FROM serviceprovider
-   WHERE LOWER(TRIM("emailid")) = $1
-   LIMIT 1`,
-  [email]
-);
-
-    if (spResult.rowCount > 0) {
+    if (serviceProviderId != null) {
       return res.json({
         exists: true,
-        id: spResult.rows[0].id,
+        id: serviceProviderId,
         user_role: "SERVICE_PROVIDER",
       });
     }
@@ -576,7 +587,12 @@ const users = {
   }
 };
 
-mongoose.connect("mongodb://serveaso:serveaso@98.130.50.75:27017/?authSource=admin", {
+const mongoUri = process.env.MONGO_URI?.trim();
+if (!mongoUri) {
+  console.error("❌ MONGO_URI is not set (services/utils/.env.development)");
+  process.exit(1);
+}
+mongoose.connect(mongoUri, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });

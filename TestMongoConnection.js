@@ -1,6 +1,10 @@
 const { MongoClient } = require('mongodb');
 
-const uri = "mongodb://serveaso:serveaso@98.130.50.75:27017/?authSource=admin"; // Replace with your EC2's public IP address
+const uri = process.env.MONGO_URI?.trim();
+if (!uri) {
+  console.error("Set MONGO_URI in services/utils/.env.development");
+  process.exit(1);
+}
 
 async function connectMongo() {
   const client = new MongoClient(uri);

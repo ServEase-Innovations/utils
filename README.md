@@ -257,6 +257,20 @@ Stop: `npm run monitoring:down`.
 
 Swagger UI is mounted at **`/api-docs`** on the main app (see `docs/swaggerDocs`).
 
+## Epoch-first contract (scoped)
+
+For production-facing utility payloads that include date/time fields, the service now returns explicit epoch mirrors:
+
+- platform settings:
+  - `updatedAt_epoch` alongside `updatedAt`
+- engagement list utility response (`services/engagementService.js`):
+  - `start_date_epoch`, `end_date_epoch`, `created_at_epoch`
+  - preserves existing `start_epoch`, `end_epoch` when present
+
+Notes:
+
+- This service contains many legacy admin/tooling endpoints; migration here is intentionally scoped to active utility outputs and does not rewrite every legacy document schema.
+
 ## License
 
 ISC (see `package.json`).

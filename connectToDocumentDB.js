@@ -8,7 +8,10 @@ const app = express();
 const port = 3000;
 
 // MongoDB URI and SSL certificate
-const uri = "mongodb://serveaso:serveaso@98.130.50.75:27017/?authSource=admin";
+const uri = process.env.MONGO_URI?.trim();
+if (!uri) {
+  throw new Error("MONGO_URI is not set");
+}
 const sslCA = fs.readFileSync('./global-bundle.p7b');  // Path to the CA file
 
 // Express JSON middleware for parsing JSON body

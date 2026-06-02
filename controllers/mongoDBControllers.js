@@ -5,11 +5,12 @@ const { ObjectId } = require('mongodb');  // Ensure ObjectId is imported
 const mongoose = require("mongoose");
 
 const axios = require('axios');
-const uri = "mongodb://serveaso:serveaso@98.130.50.75:27017/?authSource=admin"; // Replace with your MongoDB URI
-const sslCA = fs.readFileSync('./global-bundle.p7b'); // Path to the CA file
+const mongoUri = process.env.MONGO_URI?.trim();
+if (!mongoUri) {
+  throw new Error("MONGO_URI is not set (load services/utils/.env.development)");
+}
 
-
-mongoose.connect("mongodb://serveaso:serveaso@98.130.50.75:27017/?authSource=admin", {
+mongoose.connect(mongoUri, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
@@ -604,11 +605,7 @@ const deleteAll = async (req, res) => {
 
 // Function to connect to the database
 async function connectToDB() {
-  const client = new MongoClient(uri, {
-    useUnifiedTopology: true,
-    tls: false,
-    tlsCAFile: './../global-bundle.pem',
-  });
+  const client = new MongoClient(mongoUri);
   await client.connect();
   const db = client.db("pricing");
   return { db, client };
@@ -764,11 +761,7 @@ const uploadExcel = async (req, res) => {
 };
 
 async function connectToDBUserPreference() {
-  const client = new MongoClient(uri, {
-    useUnifiedTopology: true,
-    tls: false,
-    tlsCAFile: './../global-bundle.pem',
-  });
+  const client = new MongoClient(mongoUri);
   await client.connect();
   const db = client.db("user");
   return { db, client };
@@ -1127,12 +1120,14 @@ async function getPlatformSettings() {
     const { _id, updatedAt: at, ...dataFields } = doc;
     const merged = deepMergePlatform(base, dataFields);
     merged.updatedAt = at instanceof Date ? at.toISOString() : null;
+    merged.updatedAt_epoch = at instanceof Date ? Math.floor(at.getTime() / 1000) : null;
     merged.source = "database";
     return merged;
   } catch (e) {
     console.error("getPlatformSettings error:", e);
     const fallback = cloneDefaults();
     fallback.updatedAt = null;
+    fallback.updatedAt_epoch = null;
     fallback.source = "defaults";
     return fallback;
   } finally {
@@ -1158,6 +1153,7 @@ async function upsertPlatformSettings(body) {
       notifications: { ...sanitized.notifications },
       security: { ...sanitized.security },
       updatedAt: now.toISOString(),
+      updatedAt_epoch: Math.floor(now.getTime() / 1000),
       source: "database",
     };
   } finally {

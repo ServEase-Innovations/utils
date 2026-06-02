@@ -18,9 +18,10 @@ function resolveCredentialPath(filePath) {
 function getLocalCredentialCandidates() {
   return [
     resolveCredentialPath(process.env.FIREBASE_SERVICE_ACCOUNT_PATH),
+    resolveCredentialPath(process.env.GOOGLE_APPLICATION_CREDENTIALS),
     path.join(UTILS_ROOT, "secrets", "firebase-service-account.json"),
     path.join(UTILS_ROOT, "firebase-service-account.json"),
-  ];
+  ].filter(Boolean);
 }
 
 function getAdmin() {
@@ -48,8 +49,9 @@ function parseServiceAccountJson(raw) {
 }
 
 function initFromServiceAccountFile(filePath, firebaseAdmin) {
-  const resolved = resolveCredentialPath(filePath) || path.resolve(filePath);
-  if (!fs.existsSync(resolved)) return false;
+  if (!filePath) return false;
+  const resolved = resolveCredentialPath(filePath);
+  if (!resolved || !fs.existsSync(resolved)) return false;
   const cred = JSON.parse(fs.readFileSync(resolved, "utf8"));
   if (!firebaseAdmin.apps.length) {
     firebaseAdmin.initializeApp({ credential: firebaseAdmin.credential.cert(cred) });
