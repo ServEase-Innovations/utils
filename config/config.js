@@ -8,26 +8,50 @@ const ENV = process.env.NODE_ENV || "development";
 // Local will load `.env.<env>` if available.
 let envPath = path.resolve(process.cwd(), `.env.${ENV}`);
 
-// If env file does not exist (EC2), fallback to `.env`
 if (!fs.existsSync(envPath)) {
   envPath = path.resolve(process.cwd(), ".env");
 }
 
-dotenv.config({ path: envPath });
+function loadEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) return false;
+  const parsed = dotenv.parse(fs.readFileSync(filePath));
+  for (const [key, value] of Object.entries(parsed)) {
+    if (value !== "") {
+      process.env[key] = value;
+    }
+  }
+  console.log("✔ Loaded env file:", filePath);
+  return true;
+}
+
+if (!loadEnvFile(envPath)) {
+  console.warn(
+    `[utils] no ${path.resolve(process.cwd(), `.env.${ENV}`)} or .env — ` +
+      "using Render/host environment variables."
+  );
+}
 
 const { syncPostgresDbAliases, requirePostgresDatabaseName } = require("./postgresEnv.cjs");
 syncPostgresDbAliases(process.env);
 
-console.log("✔ Loaded env file:", envPath);
+let database;
+try {
+  database = requirePostgresDatabaseName(process.env);
+} catch (err) {
+  throw new Error(
+    `${err.message} On Render: Environment → add DATABASE_URL (postgresql://…/serveaso1) ` +
+      "or POSTGRES_DB=serveaso1 with POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_HOST."
+  );
+}
 
 module.exports = {
   env: ENV,
   postgres: {
-    host: process.env.POSTGRES_HOST || "127.0.0.1",
-    user: process.env.POSTGRES_USER,
-    password: process.env.POSTGRES_PASSWORD,
-    database: requirePostgresDatabaseName(process.env),
-    port: process.env.POSTGRES_PORT || 5432,
+    host: process.env.POSTGRES_HOST || process.env.DB_HOST || "127.0.0.1",
+    user: process.env.POSTGRES_USER || process.env.DB_USER,
+    password: process.env.POSTGRES_PASSWORD ?? process.env.DB_PASSWORD ?? "",
+    database,
+    port: Number(process.env.POSTGRES_PORT || process.env.DB_PORT || 5432),
   },
   mongo: {
     uri: process.env.MONGO_URI,
