@@ -15,7 +15,7 @@ if (!fs.existsSync(envPath)) {
 
 dotenv.config({ path: envPath });
 
-const { syncPostgresDbAliases, requirePostgresDatabaseName } = require("../../../scripts/postgres-env.cjs");
+const { syncPostgresDbAliases, requirePostgresDatabaseName } = require("./postgresEnv.cjs");
 syncPostgresDbAliases(process.env);
 
 console.log("✔ Loaded env file:", envPath);
