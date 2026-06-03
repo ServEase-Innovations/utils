@@ -500,81 +500,62 @@ const AUTH0_AUDIENCE = `https://${AUTH0_DOMAIN}/api/v2/`;
 
 
 
+const { lookupUserByEmail } = require("./lib/checkEmailLookup.js");
+
 app.get("/customer/check-email", async (req, res) => {
-  const email = req.query.email?.trim().toLowerCase();
+  try {
+    const result = await lookupUserByEmail(pool, req.query.email);
+    if (result.error) {
+      return res.status(result.status).json({ error: result.error });
+    }
+    return res.json(result.body);
+  } catch (err) {
+    console.error("❌ Error checking customer email:", err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+/** Align serviceprovider.emailid with Auth0 login (e.g. after legacy registration). */
+app.post("/customer/link-auth0-email", async (req, res) => {
+  const { normalizeLoginEmail } = require("./lib/checkEmailLookup.js");
+  const email = normalizeLoginEmail(req.body?.email);
+  const spId = Number(req.body?.serviceProviderId);
+  const mobile = String(req.body?.mobile ?? "").replace(/\D/g, "");
 
   if (!email) {
-    return res.status(400).json({ error: "Email query parameter is required" });
+    return res.status(400).json({ error: "email is required" });
   }
 
   try {
-    const customerResult = await pool.query(
-      `SELECT "customerid" AS id
-       FROM customer
-       WHERE LOWER(TRIM("emailid")) = $1
-       LIMIT 1`,
-      [email]
-    );
+    let updated = false;
+    if (Number.isFinite(spId) && spId > 0) {
+      const r = await pool.query(
+        `UPDATE serviceprovider SET emailid = $1
+         WHERE serviceproviderid = $2
+         RETURNING serviceproviderid`,
+        [email, spId]
+      );
+      updated = r.rowCount > 0;
+    } else if (mobile.length === 10) {
+      const r = await pool.query(
+        `UPDATE serviceprovider SET emailid = $1
+         WHERE mobileno::text = $2 OR mobileno = $2::bigint
+         RETURNING serviceproviderid`,
+        [email, mobile]
+      );
+      updated = r.rowCount > 0;
+    }
 
-    const spResult = await pool.query(
-      `SELECT "serviceproviderid" AS id
-       FROM serviceprovider
-       WHERE LOWER(TRIM("emailid")) = $1
-       LIMIT 1`,
-      [email]
-    );
-
-    const customerId =
-      customerResult.rowCount > 0 ? customerResult.rows[0].id : null;
-    const serviceProviderId =
-      spResult.rowCount > 0 ? spResult.rows[0].id : null;
-
-    if (customerId != null && serviceProviderId != null) {
-      return res.json({
-        exists: true,
-        id: customerId,
-        user_role: "CUSTOMER",
-        service_provider_id: serviceProviderId,
-        dual_role: true,
+    if (!updated) {
+      return res.status(404).json({
+        error: "No service provider updated. Pass serviceProviderId or mobile.",
       });
     }
 
-    if (customerId != null) {
-      return res.json({
-        exists: true,
-        id: customerId,
-        user_role: "CUSTOMER",
-      });
-    }
-
-    if (serviceProviderId != null) {
-      return res.json({
-        exists: true,
-        id: serviceProviderId,
-        user_role: "SERVICE_PROVIDER",
-      });
-    }
-
-    const vendorResult = await pool.query(
-  `SELECT "vendorid" AS id
-   FROM vendor
-   WHERE LOWER(TRIM("emailid")) = $1
-   LIMIT 1`,
-  [email]
-);
-if (vendorResult.rowCount > 0) {
-      return res.json({
-        exists: true,
-        id: vendorResult.rows[0].id,
-        user_role: "VENDOR",
-      });
-    }
-
-    // 3. Not found
-    return res.json({ exists: false });
-
+    const result = await lookupUserByEmail(pool, email);
+    return res.json(result.body);
   } catch (err) {
-    console.error("❌ Error checking customer email:", err);
+    console.error("link-auth0-email error:", err);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
