@@ -5,11 +5,16 @@ const { initFirebaseAdmin } = require("./services/fcm.service");
 initFirebaseAdmin();
 
 const { requireAuth0ManagementConfig } = require("./lib/auth0Management");
+const { validateUtilsProductionSecrets } = require("./config/validateProductionSecrets");
+
 try {
-  requireAuth0ManagementConfig();
+  if (process.env.NODE_ENV === "production") {
+    requireAuth0ManagementConfig();
+    validateUtilsProductionSecrets();
+  }
 } catch (err) {
   if (process.env.NODE_ENV === "production") {
-    console.error("❌", err.message);
+    console.error("❌ Production startup validation failed:", err.message);
     process.exit(1);
   }
   console.warn(
