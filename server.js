@@ -54,11 +54,17 @@ const bcrypt = require("bcrypt");
 const crypto = require("crypto");
 const {
   normalizeUsername,
-  hashUsername,
-  hashPassword,
-  verifyPassword,
+  clientUsernameHash,
+  clientPasswordHash,
+  hashPasswordStorage,
+  parseAuthBody,
+  rejectPlainAuthInProduction,
+  findUserForLogin,
   findUserByUsername,
+  verifyLoginMaterial,
   publicUserFields,
+  buildLoginPayload,
+  PASSWORD_SCHEME_WIRE,
 } = require("./lib/userCredentials");
 const QRCode = require("qrcode");
 const speakeasy = require("speakeasy");
@@ -632,7 +638,8 @@ app.post("/api/reset-password", async (req, res) => {
     return res.status(400).json({ message: "Invalid or expired token" });
   }
 
-  user.hashedPassword = await hashPassword(newPassword);
+  user.hashedPassword = await hashPasswordStorage(clientPasswordHash(newPassword));
+  user.passwordScheme = PASSWORD_SCHEME_WIRE;
 
   // Clear reset fields
   user.resetPasswordToken = undefined;
@@ -644,46 +651,77 @@ app.post("/api/reset-password", async (req, res) => {
 });
 
 
-app.post("/api/register", async (req, res) => {
-  const username = normalizeUsername(req.body?.username);
-  const password = req.body?.password;
+/** Dev helper: derive usernameHash/passwordHash without storing (omit in production). */
+app.post("/api/auth/derive-hashes", (req, res) => {
+  if (process.env.NODE_ENV === "production") {
+    return res.status(404).json({ message: "Not found" });
+  }
+  const parsed = parseAuthBody(req.body);
+  if (!parsed) {
+    return res.status(400).json({
+      message: "Provide username+password or usernameHash+passwordHash",
+    });
+  }
+  return res.json({
+    loginPayload: {
+      usernameHash: parsed.usernameHash,
+      passwordHash: parsed.passwordHash,
+    },
+  });
+});
 
-  if (!username || !password) {
-    return res.status(400).json({ message: "Username and password are required" });
+app.post("/api/register", async (req, res) => {
+  const parsed = parseAuthBody(req.body);
+  if (!parsed) {
+    return res.status(400).json({
+      message: "Provide usernameHash+passwordHash or username+password",
+      example: { usernameHash: "<sha256 hex>", passwordHash: "<sha256 hex>" },
+    });
+  }
+  if (rejectPlainAuthInProduction(parsed.mode, res)) {
+    return;
   }
 
-  const usernameKey = hashUsername(username);
+  const { usernameHash, passwordHash, username } = parsed;
+  const displayName = username || "user";
+
   const existing = await User.findOne({
-    $or: [{ usernameKey }, { username: { $regex: new RegExp(`^${username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") } }],
+    $or: [
+      { usernameWireHash: usernameHash },
+      { usernameKey: usernameHash },
+      ...(username
+        ? [{ username: { $regex: new RegExp(`^${username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") } }]
+        : []),
+    ],
   });
   if (existing) {
     return res.status(400).json({ message: "User already exists" });
   }
 
-  const secret = speakeasy.generateSecret({ name: `Servease (${username})` });
-  const hashedPassword = await hashPassword(password);
+  const secret = speakeasy.generateSecret({ name: `Servease (${displayName})` });
+  const hashedPassword = await hashPasswordStorage(passwordHash);
 
   const user = new User({
-    usernameKey,
+    usernameWireHash: usernameHash,
     hashedPassword,
+    passwordScheme: PASSWORD_SCHEME_WIRE,
     totpSecret: secret.base32,
   });
 
   await user.save();
 
   const qr = await QRCode.toDataURL(secret.otpauth_url);
+  const loginPayload = { usernameHash, passwordHash };
   res.json({
     message: "Registered",
-    credentials: {
-      username,
-      password: String(password),
-    },
+    loginPayload,
+    credentials: loginPayload,
     stored: {
-      usernameKey,
-      password: "bcrypt (hashedPassword in MongoDB — plain password is never stored)",
+      usernameWireHash: usernameHash,
+      passwordScheme: PASSWORD_SCHEME_WIRE,
+      password: "bcrypt(sha256(password)) — plain password never stored",
     },
     qr,
-    username,
   });
 });
 
@@ -710,24 +748,27 @@ app.post("/api/2fa/verify", async (req, res) => {
 
 
 app.post("/api/login", async (req, res) => {
-  const username = normalizeUsername(req.body?.username);
-  const password = req.body?.password;
-
-  if (!username || !password) {
-    return res.status(400).json({ message: "Username and password are required" });
+  const parsed = parseAuthBody(req.body);
+  if (!parsed) {
+    return res.status(400).json({
+      message: "Provide usernameHash+passwordHash or username+password",
+      example: { usernameHash: "<sha256 hex>", passwordHash: "<sha256 hex>" },
+    });
+  }
+  if (rejectPlainAuthInProduction(parsed.mode, res)) {
+    return;
   }
 
-  const user = await findUserByUsername(User, username);
+  const user = await findUserForLogin(User, parsed);
   if (!user) {
     return res.status(401).json({ message: "Invalid credentials" });
   }
 
-  const isMatch = await verifyPassword(user, password);
+  const isMatch = await verifyLoginMaterial(user, parsed);
   if (!isMatch) {
     return res.status(401).json({ message: "Invalid credentials" });
   }
 
-  // Step 1: password verified (stored as bcrypt hash); proceed to 2FA
   return res.status(200).json({
     message: "2FA required",
     ...publicUserFields(user),
