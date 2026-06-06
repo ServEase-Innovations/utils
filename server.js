@@ -31,7 +31,8 @@ const swaggerUi = require('swagger-ui-express');
 const { swaggerSpec } = require('./docs/swaggerDocs');
 const { Server } = require('ws');
 const { Client } = require('pg');
-const { getRecords, getRecordById, addRecord, updateRecord, uploadExcel, deleteAll, deleteRecord , getUserSettingsRecords , getUserSettingsById , addSettings , deleteUserPreferenceRecord ,updateUserSettings , deleteUserSettings , deleteAlUserPreference , createAuth0User  , deleteAdmin , updateAdmin , getAllAdmins, getPlatformSettings, upsertPlatformSettings, pingMongoForStatus} = require('./controllers/mongoDBControllers');
+const { getRecords, getRecordById, addRecord, updateRecord, uploadExcel, deleteAll, deleteRecord , getUserSettingsRecords , getUserSettingsById , addSettings , deleteUserPreferenceRecord ,updateUserSettings , deleteUserSettings , deleteAlUserPreference , createAuth0User  , deleteAdmin , updateAdmin , getAllAdmins, getPlatformSettings, getPublicPlatformSettings, upsertPlatformSettings, pingMongoForStatus} = require('./controllers/mongoDBControllers');
+const { requireAdminApiAuth } = require("./middleware/adminApiAuth");
 const axios = require('axios');
 const emailRoutes = require('./routes/emailRoutes');
 const bookemailRoutes = require('./routes/bookingemailRoutes');
@@ -116,25 +117,25 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 app.use('/send-email', emailRoutes);
 app.use('/api/push', pushRoutes);
-app.get('/records', async (req, res) => {
+app.get('/records', requireAdminApiAuth, async (req, res) => {
   const records = await getRecords();
   res.json(records);
 });
 
 app.use("/authO", createAuth0User);
 
-app.delete("/users/:id", deleteAdmin);
+app.delete("/users/:id", requireAdminApiAuth, deleteAdmin);
 
-app.put("/users/:id", updateAdmin);
+app.put("/users/:id", requireAdminApiAuth, updateAdmin);
 
-app.get("/users",  getAllAdmins);
+app.get("/users", requireAdminApiAuth, getAllAdmins);
 
-app.get('/user-settings', async (req, res) => {
+app.get('/user-settings', requireAdminApiAuth, async (req, res) => {
   const records = await getUserSettingsRecords();
   res.json(records);
 });
 
-app.get('/user-settings/:id', async (req, res) => {
+app.get('/user-settings/:id', requireAdminApiAuth, async (req, res) => {
 
   const recordId = req.params.id;
   const record = await getUserSettingsById(recordId);
@@ -146,7 +147,7 @@ app.get('/user-settings/:id', async (req, res) => {
 });
 
 app.post('/authO', createAuth0User);
-app.post('/records', async (req, res) => {
+app.post('/records', requireAdminApiAuth, async (req, res) => {
   const recordData = req.body;
   try {
     const result = await addRecord(recordData);
@@ -157,7 +158,7 @@ app.post('/records', async (req, res) => {
   }
 });
 
-app.post('/user-settings', async (req, res) => {
+app.post('/user-settings', requireAdminApiAuth, async (req, res) => {
   const recordData = req.body;
   try {
     const result = await addSettings(recordData);
@@ -169,11 +170,11 @@ app.post('/user-settings', async (req, res) => {
 });
 
 
-app.put('/user-settings/:id', updateUserSettings);
-app.delete('/user-settings/:id', deleteUserSettings);
-app.delete('/user-settings/delete-all', deleteAlUserPreference);
+app.put('/user-settings/:id', requireAdminApiAuth, updateUserSettings);
+app.delete('/user-settings/:id', requireAdminApiAuth, deleteUserSettings);
+app.delete('/user-settings/delete-all', requireAdminApiAuth, deleteAlUserPreference);
 
-app.get('/records/:id', async (req, res) => {
+app.get('/records/:id', requireAdminApiAuth, async (req, res) => {
   const recordId = req.params.id;
   if (!ObjectId.isValid(recordId)) {
     return res.status(400).json({ message: 'Invalid ID format' });
@@ -188,10 +189,10 @@ app.get('/records/:id', async (req, res) => {
 });
 
 
-app.put('/records/:id', updateRecord);
-app.delete('/records/:id', deleteRecord);
-app.post('/upload', upload.single('file'), uploadExcel);
-app.delete('/delete-all', deleteAll);
+app.put('/records/:id', requireAdminApiAuth, updateRecord);
+app.delete('/records/:id', requireAdminApiAuth, deleteRecord);
+app.post('/upload', requireAdminApiAuth, upload.single('file'), uploadExcel);
+app.delete('/delete-all', requireAdminApiAuth, deleteAll);
 
 app.get("/metrics", async (req, res, next) => {
   try {
@@ -202,8 +203,19 @@ app.get("/metrics", async (req, res, next) => {
   }
 });
 
-// --- Admin platform settings (ServEase Settings UI) ---
-app.get("/api/platform-settings", async (req, res) => {
+// --- Platform settings ---
+/** Public: cancellation policy for customer bookings UI */
+app.get("/api/platform-settings/public", async (req, res) => {
+  try {
+    const settings = await getPublicPlatformSettings();
+    res.json({ success: true, settings });
+  } catch (err) {
+    console.error("GET /api/platform-settings/public:", err);
+    res.status(500).json({ success: false, error: err?.message || "Failed to load settings" });
+  }
+});
+
+app.get("/api/platform-settings", requireAdminApiAuth, async (req, res) => {
   try {
     const settings = await getPlatformSettings();
     res.json({ success: true, settings });
@@ -213,7 +225,7 @@ app.get("/api/platform-settings", async (req, res) => {
   }
 });
 
-app.put("/api/platform-settings", async (req, res) => {
+app.put("/api/platform-settings", requireAdminApiAuth, async (req, res) => {
   try {
     const settings = await upsertPlatformSettings(req.body);
     res.json({ success: true, settings });
@@ -258,7 +270,7 @@ async function probeHttpService(id, label, baseUrl, pathCandidates) {
   return { id, label, status: "error", detail: String(lastDetail) };
 }
 
-app.get("/api/platform-status", async (req, res) => {
+app.get("/api/platform-status", requireAdminApiAuth, async (req, res) => {
   const env = process.env.NODE_ENV || "development";
   const payBase = (process.env.PAYMENTS_SERVICE_URL || "http://127.0.0.1:4100").replace(/\/$/, "");
   const providersBase = (process.env.PROVIDERS_SERVICE_URL || "http://127.0.0.1:4000").replace(/\/$/, "");

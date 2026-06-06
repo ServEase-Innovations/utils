@@ -1131,6 +1131,15 @@ function sanitizePlatformBody(body) {
   };
 }
 
+/** Customer-safe subset (cancellation policy only). */
+async function getPublicPlatformSettings() {
+  const full = await getPlatformSettings();
+  return {
+    cancellation:
+      full?.cancellation ?? cloneDefaults().cancellation,
+  };
+}
+
 async function getPlatformSettings() {
   const { db, client } = await connectToDB();
   try {
@@ -1218,6 +1227,7 @@ module.exports = {
   updateAdmin,
   getAllAdmins,
   getPlatformSettings,
+  getPublicPlatformSettings,
   upsertPlatformSettings,
   pingMongoForStatus,
 };
