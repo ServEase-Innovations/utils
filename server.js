@@ -672,7 +672,19 @@ app.post("/api/register", async (req, res) => {
   await user.save();
 
   const qr = await QRCode.toDataURL(secret.otpauth_url);
-  res.json({ message: "Registered", qr, username });
+  res.json({
+    message: "Registered",
+    credentials: {
+      username,
+      password: String(password),
+    },
+    stored: {
+      usernameKey,
+      password: "bcrypt (hashedPassword in MongoDB — plain password is never stored)",
+    },
+    qr,
+    username,
+  });
 });
 
 
