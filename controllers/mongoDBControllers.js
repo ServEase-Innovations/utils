@@ -1005,6 +1005,14 @@ const DEFAULT_PLATFORM_SETTINGS = {
     sessionTimeout: true,
     sessionDurationMinutes: 30,
   },
+  cancellation: {
+    onDemandMinutesBeforeStart: 30,
+    shortTermDaysBeforeStart: 2,
+    monthlyDaysBeforeStart: 2,
+  },
+  providerReminders: {
+    overdueStartIntervalMinutes: 15,
+  },
 };
 
 function deepMergePlatform(target, source) {
@@ -1070,6 +1078,8 @@ function sanitizePlatformBody(body) {
   const f = b.features && typeof b.features === "object" ? b.features : {};
   const n = b.notifications && typeof b.notifications === "object" ? b.notifications : {};
   const s = b.security && typeof b.security === "object" ? b.security : {};
+  const c = b.cancellation && typeof b.cancellation === "object" ? b.cancellation : {};
+  const pr = b.providerReminders && typeof b.providerReminders === "object" ? b.providerReminders : {};
   return {
     platformName: sanitizeString(b.platformName, 200) ?? DEFAULT_PLATFORM_SETTINGS.platformName,
     supportEmail: sanitizeString(b.supportEmail, 200) ?? DEFAULT_PLATFORM_SETTINGS.supportEmail,
@@ -1103,6 +1113,34 @@ function sanitizePlatformBody(body) {
         5,
         10080,
         DEFAULT_PLATFORM_SETTINGS.security.sessionDurationMinutes
+      ),
+    },
+    cancellation: {
+      onDemandMinutesBeforeStart: sanitizeInt(
+        c.onDemandMinutesBeforeStart,
+        0,
+        24 * 60,
+        DEFAULT_PLATFORM_SETTINGS.cancellation.onDemandMinutesBeforeStart
+      ),
+      shortTermDaysBeforeStart: sanitizeInt(
+        c.shortTermDaysBeforeStart,
+        0,
+        365,
+        DEFAULT_PLATFORM_SETTINGS.cancellation.shortTermDaysBeforeStart
+      ),
+      monthlyDaysBeforeStart: sanitizeInt(
+        c.monthlyDaysBeforeStart,
+        0,
+        365,
+        DEFAULT_PLATFORM_SETTINGS.cancellation.monthlyDaysBeforeStart
+      ),
+    },
+    providerReminders: {
+      overdueStartIntervalMinutes: sanitizeInt(
+        pr.overdueStartIntervalMinutes,
+        5,
+        180,
+        DEFAULT_PLATFORM_SETTINGS.providerReminders.overdueStartIntervalMinutes
       ),
     },
   };
@@ -1152,6 +1190,8 @@ async function upsertPlatformSettings(body) {
       features: { ...sanitized.features },
       notifications: { ...sanitized.notifications },
       security: { ...sanitized.security },
+      cancellation: { ...sanitized.cancellation },
+      providerReminders: { ...sanitized.providerReminders },
       updatedAt: now.toISOString(),
       updatedAt_epoch: Math.floor(now.getTime() / 1000),
       source: "database",
