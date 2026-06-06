@@ -51,6 +51,15 @@ const jwksRsa = require('jwks-rsa');
 const mongoose = require("mongoose");
 const User = require("./models/User");
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
+const {
+  normalizeUsername,
+  hashUsername,
+  hashPassword,
+  verifyPassword,
+  findUserByUsername,
+  publicUserFields,
+} = require("./lib/userCredentials");
 const QRCode = require("qrcode");
 const speakeasy = require("speakeasy");
 const config = require("./config/config.js");
@@ -613,18 +622,17 @@ app.post("/api/reset-password", async (req, res) => {
     .update(token)
     .digest("hex");
 
-  const user = await User.findOne({
-    username,
-    resetPasswordToken: hashedToken,
-    resetPasswordExpires: { $gt: Date.now() },
-  });
-
-  if (!user) {
+  const user = await findUserByUsername(User, username);
+  if (
+    !user ||
+    user.resetPasswordToken !== hashedToken ||
+    !user.resetPasswordExpires ||
+    user.resetPasswordExpires <= Date.now()
+  ) {
     return res.status(400).json({ message: "Invalid or expired token" });
   }
 
-  // Hash new password
-  user.hashedPassword = await bcrypt.hash(newPassword, 10);
+  user.hashedPassword = await hashPassword(newPassword);
 
   // Clear reset fields
   user.resetPasswordToken = undefined;
@@ -637,19 +645,28 @@ app.post("/api/reset-password", async (req, res) => {
 
 
 app.post("/api/register", async (req, res) => {
-  const { username, password } = req.body;
+  const username = normalizeUsername(req.body?.username);
+  const password = req.body?.password;
 
-  const existing = await User.findOne({ username });
-  if (existing) return res.status(400).json({ message: "User already exists" });
+  if (!username || !password) {
+    return res.status(400).json({ message: "Username and password are required" });
+  }
+
+  const usernameKey = hashUsername(username);
+  const existing = await User.findOne({
+    $or: [{ usernameKey }, { username: { $regex: new RegExp(`^${username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") } }],
+  });
+  if (existing) {
+    return res.status(400).json({ message: "User already exists" });
+  }
 
   const secret = speakeasy.generateSecret({ name: `Servease (${username})` });
-
-  const hashedPassword = await bcrypt.hash(password, 10);
+  const hashedPassword = await hashPassword(password);
 
   const user = new User({
-    username,
+    usernameKey,
     hashedPassword,
-    totpSecret: secret.base32
+    totpSecret: secret.base32,
   });
 
   await user.save();
@@ -662,7 +679,7 @@ app.post("/api/register", async (req, res) => {
 app.post("/api/2fa/verify", async (req, res) => {
   const { username, token } = req.body;
 
-  const user = await User.findOne({ username });
+  const user = await findUserByUsername(User, username);
   if (!user) return res.status(400).json({ message: "User not found" });
 
   const verified = speakeasy.totp.verify({
@@ -680,18 +697,29 @@ app.post("/api/2fa/verify", async (req, res) => {
 });
 
 
-app.post('/api/login', async (req, res) => {
-  const { username, password } = req.body;
-  const user = await User.findOne({ username });
+app.post("/api/login", async (req, res) => {
+  const username = normalizeUsername(req.body?.username);
+  const password = req.body?.password;
 
-  if (!user) return res.status(401).json({ message: "Invalid credentials" });
+  if (!username || !password) {
+    return res.status(400).json({ message: "Username and password are required" });
+  }
 
-  const isMatch = await bcrypt.compare(password, user.hashedPassword);
+  const user = await findUserByUsername(User, username);
+  if (!user) {
+    return res.status(401).json({ message: "Invalid credentials" });
+  }
 
-  if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
+  const isMatch = await verifyPassword(user, password);
+  if (!isMatch) {
+    return res.status(401).json({ message: "Invalid credentials" });
+  }
 
-  // Step 1: Ask for 2FA
-  return res.status(200).json({ message: "2FA required", userId: user._id });
+  // Step 1: password verified (stored as bcrypt hash); proceed to 2FA
+  return res.status(200).json({
+    message: "2FA required",
+    ...publicUserFields(user),
+  });
 });
 
 
@@ -700,7 +728,7 @@ app.post("/api/verify", async (req, res) => {
   const { username, token } = req.body;
   console.log("Verifying:", username, token);
 
-  const user = await User.findOne({ username });
+  const user = await findUserByUsername(User, username);
   if (!user || !user.totpSecret) {
     return res.status(400).json({ message: "User not found or 2FA not configured" });
   }
@@ -725,7 +753,7 @@ app.post("/api/verify", async (req, res) => {
 app.post("/api/verify-token", async (req, res) => {
   const { username, token } = req.body;
 
-  const user = await User.findOne({ username });
+  const user = await findUserByUsername(User, username);
   if (!user) return res.status(400).json({ message: "User not found" });
 
   if (!user.totpSecret) {
