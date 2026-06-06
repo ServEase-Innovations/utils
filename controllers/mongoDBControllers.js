@@ -4,7 +4,7 @@ const xlsx = require('xlsx');
 const { ObjectId } = require('mongodb');  // Ensure ObjectId is imported
 const mongoose = require("mongoose");
 
-const axios = require('axios');
+const { createAuth0DatabaseUser } = require('../lib/auth0Management');
 const mongoUri = process.env.MONGO_URI?.trim();
 if (!mongoUri) {
   throw new Error("MONGO_URI is not set (load services/utils/.env.development)");
@@ -944,35 +944,20 @@ const createAuth0User = async (req, res) => {
   console.log("Creating Auth0 user with email:", email);
 
   try {
-    // 1. Get Auth0 Management API Token
-    const tokenRes = await axios.post(`https://dev-plavkbiy7v55pbg4.us.auth0.com/oauth/token`, {
-      client_id: "jFQGiT8Hb9KlNbdhb452TUhnjK7iroTj",
-      client_secret: "Ya_kgQTObJ7eE_9sV4JuUWHMPIY7F_WUeHk2L_0GBK85v35BD1YQK1j7vfyTxN5h",
-      audience: `https://dev-plavkbiy7v55pbg4.us.auth0.com/api/v2/`,
-      grant_type: "client_credentials"
-    });
-
-    const accessToken = tokenRes.data.access_token;
-
-    // 2. Create User in Auth0
-    const userRes = await axios.post(`https://dev-plavkbiy7v55pbg4.us.auth0.com/api/v2/users`, {
-      email,
-      password,
-      name,
-      connection: "Username-Password-Authentication"
-    }, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    });
-
-    res.status(201).json({ message: "User created successfully", userId: userRes.data.user_id });
+    const user = await createAuth0DatabaseUser({ email, password, name });
+    res.status(201).json({ message: "User created successfully", userId: user.user_id });
   } catch (err) {
-    console.error("❌ Error creating Auth0 user:", err.response?.data || err.message);
-    res.status(500).json({
-      error: "Failed to create user",
-      details: err.response?.data || err.message
-    });
+    if (err.code === "AUTH0_CONFIG_MISSING") {
+      console.error("Auth0 Management API not configured:", err.message);
+      return res.status(503).json({ error: "Auth0 user creation is not configured" });
+    }
+
+    console.error("Error creating Auth0 user:", err.response?.data || err.message);
+    const payload = { error: "Failed to create user" };
+    if (process.env.NODE_ENV !== "production") {
+      payload.details = err.response?.data || err.message;
+    }
+    res.status(500).json(payload);
   }
 };
 

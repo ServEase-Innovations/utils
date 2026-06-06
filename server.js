@@ -4,6 +4,21 @@ require("./config/config.js");
 const { initFirebaseAdmin } = require("./services/fcm.service");
 initFirebaseAdmin();
 
+const { requireAuth0ManagementConfig } = require("./lib/auth0Management");
+try {
+  requireAuth0ManagementConfig();
+} catch (err) {
+  if (process.env.NODE_ENV === "production") {
+    console.error("❌", err.message);
+    process.exit(1);
+  }
+  console.warn(
+    "⚠️",
+    err.message,
+    "— POST /authO will return 503 until AUTH0_* env vars are set."
+  );
+}
+
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -490,15 +505,6 @@ wss.on("connection", (ws) => {
     console.error("❌ PostgreSQL error:", err);
   });
 })();
-
-// 🔒 Auth0 Management API credentials (store securely in .env)
-const AUTH0_DOMAIN = 'dev-y0yafxo2cjqtu8y2.us.auth0.com';
-const AUTH0_CLIENT_ID = 'YOUR_MANAGEMENT_CLIENT_ID';
-const AUTH0_CLIENT_SECRET = 'YOUR_MANAGEMENT_CLIENT_SECRET';
-const AUTH0_AUDIENCE = `https://${AUTH0_DOMAIN}/api/v2/`;
-
-
-
 
 const { lookupUserByEmail } = require("./lib/checkEmailLookup.js");
 
