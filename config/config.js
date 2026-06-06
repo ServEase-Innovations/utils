@@ -31,6 +31,20 @@ if (!loadEnvFile(envPath)) {
   );
 }
 
+// Monorepo root .env.local — fills AUTH0_*, MONGO_URI, etc. without overriding service env.
+const monorepoRoot = path.resolve(process.cwd(), "../..");
+for (const name of [".env.local", ".env.monorepo"]) {
+  const sharedPath = path.join(monorepoRoot, name);
+  if (!fs.existsSync(sharedPath)) continue;
+  const parsed = dotenv.parse(fs.readFileSync(sharedPath));
+  for (const [key, value] of Object.entries(parsed)) {
+    if (value !== "" && process.env[key] == null) {
+      process.env[key] = value;
+    }
+  }
+  console.log("✔ Loaded shared env (fill gaps):", sharedPath);
+}
+
 const { syncPostgresDbAliases, requirePostgresDatabaseName } = require("./postgresEnv.cjs");
 syncPostgresDbAliases(process.env);
 
