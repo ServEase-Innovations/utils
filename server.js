@@ -59,6 +59,8 @@ const {
   hashPasswordStorage,
   parseAuthBody,
   rejectPlainAuthInProduction,
+  parseUsernameLookup,
+  findUserByLookup,
   findUserForLogin,
   findUserByUsername,
   verifyLoginMaterial,
@@ -727,9 +729,13 @@ app.post("/api/register", async (req, res) => {
 
 
 app.post("/api/2fa/verify", async (req, res) => {
-  const { username, token } = req.body;
+  const { token } = req.body;
+  const lookup = parseUsernameLookup(req.body);
+  if (!lookup || !token) {
+    return res.status(400).json({ message: "usernameHash (or username) and token are required" });
+  }
 
-  const user = await findUserByUsername(User, username);
+  const user = await findUserByLookup(User, lookup);
   if (!user) return res.status(400).json({ message: "User not found" });
 
   const verified = speakeasy.totp.verify({
@@ -778,10 +784,13 @@ app.post("/api/login", async (req, res) => {
 
 
 app.post("/api/verify", async (req, res) => {
-  const { username, token } = req.body;
-  console.log("Verifying:", username, token);
+  const { token } = req.body;
+  const lookup = parseUsernameLookup(req.body);
+  if (!lookup || !token) {
+    return res.status(400).json({ message: "usernameHash (or username) and token are required" });
+  }
 
-  const user = await findUserByUsername(User, username);
+  const user = await findUserByLookup(User, lookup);
   if (!user || !user.totpSecret) {
     return res.status(400).json({ message: "User not found or 2FA not configured" });
   }
@@ -804,9 +813,13 @@ app.post("/api/verify", async (req, res) => {
 
 
 app.post("/api/verify-token", async (req, res) => {
-  const { username, token } = req.body;
+  const { token } = req.body;
+  const lookup = parseUsernameLookup(req.body);
+  if (!lookup || !token) {
+    return res.status(400).json({ message: "usernameHash (or username) and token are required" });
+  }
 
-  const user = await findUserByUsername(User, username);
+  const user = await findUserByLookup(User, lookup);
   if (!user) return res.status(400).json({ message: "User not found" });
 
   if (!user.totpSecret) {
