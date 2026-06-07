@@ -421,7 +421,19 @@ server.listen(port, () => {
 });
 
 // Secondary HTTP app (email send routes); scale out separately in production if needed
-appForEmail.use(cors());
+appForEmail.use(cors({
+  origin: corsOriginCallback(allowedCorsOrigins),
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Origin",
+    "X-Requested-With",
+    "Content-Type",
+    "Accept",
+    "Authorization",
+  ],
+  credentials: true,
+  optionsSuccessStatus: 204,
+}));
 appForEmail.use(requestMetrics);
 appForEmail.use(bodyParser.json());
 appForEmail.use(express.json());
