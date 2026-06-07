@@ -1,6 +1,12 @@
 const client = require("prom-client");
 
+const SERVICE_NAME = "utils";
+
 const register = new client.Registry();
+register.setDefaultLabels({
+  service: SERVICE_NAME,
+  environment: process.env.NODE_ENV || "development",
+});
 client.collectDefaultMetrics({ register });
 
 const httpRequestDurationMs = new client.Histogram({
