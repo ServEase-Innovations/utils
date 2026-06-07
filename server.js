@@ -26,6 +26,12 @@ try {
 
 const express = require('express');
 const cors = require('cors');
+const {
+  parseCorsOrigins,
+  corsOriginCallback,
+  createWsVerifyClient,
+} = require("./lib/corsOrigins");
+const { createHealthRouter } = require("./routes/health");
 const bodyParser = require('body-parser');
 const swaggerUi = require('swagger-ui-express');
 const { swaggerSpec } = require('./docs/swaggerDocs');
@@ -124,8 +130,25 @@ const razorpay =
     ? new Razorpay({ key_id: razorpayKeyId, key_secret: razorpayKeySecret })
     : null;
 
+const allowedCorsOrigins = parseCorsOrigins();
+
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: corsOriginCallback(allowedCorsOrigins),
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Origin",
+    "X-Requested-With",
+    "Content-Type",
+    "Accept",
+    "Authorization",
+    "X-Admin-Push-Secret",
+    "X-Admin-Api-Secret",
+  ],
+  credentials: true,
+  optionsSuccessStatus: 204,
+}));
+app.use(createHealthRouter(pool));
 app.use(requestMetrics);
 app.use(bodyParser.json());
 app.use(express.json());
@@ -447,7 +470,10 @@ emailServer.listen(emailPort, () => {
 
 
 // ✅ WebSocket server now correctly uses the HTTP server
-const wss = new Server({ server });
+const wss = new Server({
+  server,
+  verifyClient: createWsVerifyClient(allowedCorsOrigins),
+});
 const connectedNumbers = new Map();
 
 

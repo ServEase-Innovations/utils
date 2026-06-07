@@ -1,3 +1,5 @@
+const { assertCorsOriginsProduction } = require("../lib/corsOrigins");
+
 const FORBIDDEN_PRODUCTION_SECRETS = new Set([
   "serveaso-test-push-secret",
   "change-me-in-production",
@@ -24,6 +26,7 @@ function validateUtilsProductionSecrets() {
   }
 
   assertProductionEnv("ADMIN_PUSH_SECRET", process.env.ADMIN_PUSH_SECRET);
+  assertCorsOriginsProduction();
 }
 
 module.exports = { validateUtilsProductionSecrets, FORBIDDEN_PRODUCTION_SECRETS };
