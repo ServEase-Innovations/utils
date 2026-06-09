@@ -998,6 +998,10 @@ const DEFAULT_PLATFORM_SETTINGS = {
   providerReminders: {
     overdueStartIntervalMinutes: 15,
   },
+  customerReminders: {
+    /** Minutes after booking creation to send each payment-pending reminder (ascending). */
+    paymentPendingOffsetsMinutes: [15, 60, 180],
+  },
 };
 
 function deepMergePlatform(target, source) {
@@ -1065,6 +1069,7 @@ function sanitizePlatformBody(body) {
   const s = b.security && typeof b.security === "object" ? b.security : {};
   const c = b.cancellation && typeof b.cancellation === "object" ? b.cancellation : {};
   const pr = b.providerReminders && typeof b.providerReminders === "object" ? b.providerReminders : {};
+  const cr = b.customerReminders && typeof b.customerReminders === "object" ? b.customerReminders : {};
   return {
     platformName: sanitizeString(b.platformName, 200) ?? DEFAULT_PLATFORM_SETTINGS.platformName,
     supportEmail: sanitizeString(b.supportEmail, 200) ?? DEFAULT_PLATFORM_SETTINGS.supportEmail,
@@ -1128,7 +1133,28 @@ function sanitizePlatformBody(body) {
         DEFAULT_PLATFORM_SETTINGS.providerReminders.overdueStartIntervalMinutes
       ),
     },
+    customerReminders: {
+      paymentPendingOffsetsMinutes: sanitizePaymentPendingOffsets(
+        cr.paymentPendingOffsetsMinutes,
+        DEFAULT_PLATFORM_SETTINGS.customerReminders.paymentPendingOffsetsMinutes
+      ),
+    },
   };
+}
+
+function sanitizePaymentPendingOffsets(raw, fallback) {
+  const base = Array.isArray(fallback) ? fallback : [15, 60, 180];
+  if (!Array.isArray(raw)) {
+    return [...base];
+  }
+  const normalized = [
+    ...new Set(
+      raw
+        .map((v) => sanitizeInt(v, 1, 7 * 24 * 60, null))
+        .filter((n) => n != null)
+    ),
+  ].sort((a, b) => a - b);
+  return normalized.length > 0 ? normalized : [...base];
 }
 
 /** Customer-safe subset (cancellation policy only). */
@@ -1186,6 +1212,7 @@ async function upsertPlatformSettings(body) {
       security: { ...sanitized.security },
       cancellation: { ...sanitized.cancellation },
       providerReminders: { ...sanitized.providerReminders },
+      customerReminders: { ...sanitized.customerReminders },
       updatedAt: now.toISOString(),
       updatedAt_epoch: Math.floor(now.getTime() / 1000),
       source: "database",
