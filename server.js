@@ -44,6 +44,7 @@ const emailRoutes = require('./routes/emailRoutes');
 const bookemailRoutes = require('./routes/bookingemailRoutes');
 const rescheduleEmailRoutes = require('./routes/rescheduleEmailRoutes');
 const cancelEmailRoutes = require('./routes/cancelEmailRoutes');
+const contactUsRoutes = require('./routes/contactUsRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const pushRoutes = require('./routes/pushRoutes');
 const { connectToDB } = require('./controllers/mongoDBControllers');
@@ -156,6 +157,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 app.use('/send-email', emailRoutes);
+app.use('/api/contact-us', contactUsRoutes);
 app.use('/api/push', pushRoutes);
 app.get('/records', requireAdminApiAuth, async (req, res) => {
   const records = await getRecords();
