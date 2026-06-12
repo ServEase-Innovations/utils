@@ -658,6 +658,24 @@ mongoose.connect(mongoUri, {
   useUnifiedTopology: true,
 });
 
+/** Legacy DB index username_1 is unique; wire-only signups left username null and hit E11000. */
+mongoose.connection.once("open", async () => {
+  try {
+    const stale = await User.find({
+      $or: [{ username: null }, { username: "" }],
+      usernameWireHash: { $exists: true, $ne: null },
+    });
+    for (const doc of stale) {
+      if (doc.usernameWireHash) {
+        doc.username = doc.usernameWireHash;
+        await doc.save();
+      }
+    }
+  } catch (err) {
+    console.warn("⚠️ Admin user username backfill skipped:", err?.message || err);
+  }
+});
+
 app.post("/api/reset-password", async (req, res) => {
   const { username, token, newPassword } = req.body;
 
@@ -690,6 +708,68 @@ app.post("/api/reset-password", async (req, res) => {
   await user.save();
 
   res.json({ message: "Password reset successful" });
+});
+
+/** Reset password using authenticator (admin accounts use 2FA; no recovery email on file). */
+app.post("/api/reset-password-2fa", async (req, res) => {
+  const lookup = parseUsernameLookup(req.body);
+  const token = String(req.body?.token ?? "").trim();
+  const newPasswordHash = String(req.body?.newPasswordHash ?? "").trim();
+  const newPassword = req.body?.newPassword;
+
+  if (!lookup || !token) {
+    return res.status(400).json({
+      message: "Username and authenticator code are required",
+    });
+  }
+
+  let passwordMaterial = newPasswordHash;
+  if (!passwordMaterial) {
+    if (newPassword != null && String(newPassword).length > 0) {
+      if (process.env.NODE_ENV === "production") {
+        return res.status(400).json({
+          message: "Send newPasswordHash in the request body (plain password not allowed in production).",
+        });
+      }
+      passwordMaterial = clientPasswordHash(newPassword);
+    }
+  }
+
+  if (!passwordMaterial) {
+    return res.status(400).json({ message: "New password is required" });
+  }
+
+  const user = await findUserByLookup(User, lookup);
+  if (!user || !user.totpSecret) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return res.status(400).json({
+      message: "Invalid username or authenticator code",
+    });
+  }
+
+  const verified = speakeasy.totp.verify({
+    secret: user.totpSecret,
+    encoding: "base32",
+    token,
+    window: 1,
+  });
+
+  if (!verified) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    return res.status(400).json({
+      message: "Invalid username or authenticator code",
+    });
+  }
+
+  user.hashedPassword = await hashPasswordStorage(passwordMaterial);
+  user.passwordScheme = PASSWORD_SCHEME_WIRE;
+  user.resetPasswordToken = undefined;
+  user.resetPasswordExpires = undefined;
+  await user.save();
+
+  res.json({
+    message: "Password reset successful. You can sign in with your new password.",
+  });
 });
 
 
@@ -725,14 +805,25 @@ app.post("/api/register", async (req, res) => {
   }
 
   const { usernameHash, passwordHash, username } = parsed;
-  const displayName = username || "user";
+  const normalizedUsername = normalizeUsername(username).toLowerCase();
+  const storedUsername = normalizedUsername || usernameHash;
+  const displayName = normalizedUsername || "user";
 
   const existing = await User.findOne({
     $or: [
       { usernameWireHash: usernameHash },
       { usernameKey: usernameHash },
-      ...(username
-        ? [{ username: { $regex: new RegExp(`^${username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i") } }]
+      ...(normalizedUsername
+        ? [
+            {
+              username: {
+                $regex: new RegExp(
+                  `^${normalizedUsername.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+                  "i"
+                ),
+              },
+            },
+          ]
         : []),
     ],
   });
@@ -744,13 +835,21 @@ app.post("/api/register", async (req, res) => {
   const hashedPassword = await hashPasswordStorage(passwordHash);
 
   const user = new User({
+    username: storedUsername,
     usernameWireHash: usernameHash,
     hashedPassword,
     passwordScheme: PASSWORD_SCHEME_WIRE,
     totpSecret: secret.base32,
   });
 
-  await user.save();
+  try {
+    await user.save();
+  } catch (err) {
+    if (err?.code === 11000) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+    throw err;
+  }
 
   const qr = await QRCode.toDataURL(secret.otpauth_url);
   const loginPayload = { usernameHash, passwordHash };
@@ -851,6 +950,33 @@ app.post("/api/verify", async (req, res) => {
 
 
 
+
+/** Poll role after login while account is pending Super Admin approval. */
+app.post("/api/admin/role-status", async (req, res) => {
+  const userId = String(req.body?.userId ?? "").trim();
+  const usernameHash = String(req.body?.usernameHash ?? req.body?.u ?? "").trim();
+
+  if (!userId || !usernameHash) {
+    return res.status(400).json({ message: "userId and usernameHash are required" });
+  }
+
+  const user = await User.findById(userId);
+  if (!user) {
+    return res.status(404).json({ message: "User not found" });
+  }
+
+  const wireHash = String(user.usernameWireHash ?? "");
+  const legacyKey = String(user.usernameKey ?? "");
+  if (wireHash !== usernameHash && legacyKey !== usernameHash) {
+    return res.status(403).json({ message: "Invalid session" });
+  }
+
+  return res.json({
+    role: user.role,
+    userId: user._id,
+    message: "Role status retrieved",
+  });
+});
 
 app.post("/api/verify-token", async (req, res) => {
   const { token } = req.body;
