@@ -64,7 +64,7 @@ Push notifications are handled by the **utils** service. Mobile apps register FC
 
 ### 1. Firebase project (Google Cloud)
 
-1. Open [Firebase Console](https://console.firebase.google.com/) and select your project (e.g. `serveaso-android`).
+1. Open [Firebase Console](https://console.firebase.google.com/) and use **one project** for mobile + server (iOS app, Android app, and `FIREBASE_SERVICE_ACCOUNT_JSON` must all match).
 2. Add **iOS** and/or **Android** apps with the correct bundle ID / package name.
 3. Download client config:
    - **iOS:** `GoogleService-Info.plist` → add to the Xcode project under `apps/servease-ios/ios/`.
@@ -232,7 +232,44 @@ The page calls `/api/push/stats`, `/api/push/devices`, and `/api/push/send` with
 | `503` on send | Same as above |
 | No devices listed | Mongo connection, app reached `/api/push/register`, token length ≥ 100 |
 | iOS no token | Real device, push capability, `GoogleService-Info.plist` |
+| `messaging/mismatched-credential` / SenderId mismatch | iOS `GoogleService-Info.plist` and utils `FIREBASE_SERVICE_ACCOUNT_JSON` are from **different Firebase projects**. Align them (see below). Check admin **GET /api/push/stats** → `firebaseProjectId`. |
+| `messaging/third-party-auth-error` / missing OAuth credential | **APNs auth key not uploaded** (or wrong Key ID / Team ID) in Firebase **serveaso-android** → Cloud Messaging. FCM accepted the request but Apple rejected it. See [APNs setup](#apns-authentication-key-required-for-ios). |
+| `messaging/invalid-apns-credentials` | Same as above — upload or replace the `.p8` APNs key in Firebase Cloud Messaging. |
 | Android no notification | POST_NOTIFICATIONS (API 33+), Notifee channel `serveaso_default` |
+
+#### SenderId mismatch (iOS push fails to deliver)
+
+The iPhone registers an FCM token using **`GCM_SENDER_ID` from `GoogleService-Info.plist`**. Utils sends with **`FIREBASE_SERVICE_ACCOUNT_JSON`**. If those come from different Firebase projects, FCM returns `messaging/mismatched-credential`.
+
+**Current iOS app** (`apps/servease-ios/ios/GoogleService-Info.plist`):
+
+- Project: `serveaso-android` (shared with Android + utils `FIREBASE_SERVICE_ACCOUNT_JSON`)
+- GCM sender: `87480797347`
+- Bundle ID: `in.serveaseinnovation.serveaso`
+- Firebase iOS app ID: `1:87480797347:ios:dc0e08c1490994f6eb9716`
+
+**Fix (pick one):**
+
+1. **Align the iOS app** — `GoogleService-Info.plist` must come from the **same** Firebase project as `FIREBASE_SERVICE_ACCOUNT_JSON` on utils. Re-download from Firebase Console → project **serveaso-android** → iOS app **Serveaso App Store** (`in.serveaseinnovation.serveaso`), replace the plist, rebuild the app, re-register the FCM token.
+
+2. **Or align the server** — set Render `FIREBASE_SERVICE_ACCOUNT_JSON` to a service account from the Firebase project that matches the app’s plist (must be the same `project_id` / sender ID).
+
+After fixing, `GET /api/push/stats` should show `firebaseProjectId` matching the app’s Firebase project.
+
+#### APNs authentication key (required for iOS)
+
+FCM delivers iOS pushes via **Apple APNs**. After aligning Firebase projects, you may still see:
+
+`messaging/third-party-auth-error` — Firebase has no valid APNs credentials for project **serveaso-android**.
+
+**One-time setup:**
+
+1. [Apple Developer](https://developer.apple.com/account/resources/authkeys/list) → **Keys** → **+** → enable **Apple Push Notifications service (APNs)** → download **`.p8`** (save Key ID; file is download-once).
+2. Team ID for Servease Innovation: **`9RXM3W27X2`** (matches Xcode `DEVELOPMENT_TEAM`).
+3. [Firebase Console](https://console.firebase.google.com/) → project **`serveaso-android`** → ⚙️ **Project settings** → **Cloud Messaging** → **Apple app configuration** → **APNs Authentication Key** → Upload `.p8`, enter **Key ID** and **Team ID**.
+4. Send a test push from admin — **no app rebuild** needed once the key is saved.
+
+If you previously uploaded APNs only to the old **`serveaso-ios`** Firebase project, repeat the upload on **`serveaso-android`** (keys are per Firebase project).
 
 ---
 

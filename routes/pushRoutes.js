@@ -1,7 +1,11 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const DeviceToken = require("../models/DeviceToken");
-const { sendToTokens, isFcmReady } = require("../services/fcm.service");
+const {
+  sendToTokens,
+  isFcmReady,
+  getFirebaseProjectId,
+} = require("../services/fcm.service");
 const { adminPushAuth } = require("../middleware/adminPushAuth");
 
 const router = express.Router();
@@ -194,7 +198,26 @@ router.post("/send", adminPushAuth, async (req, res) => {
       if (!r.success) {
         const code = r.error?.code || "unknown";
         const message = r.error?.message || "Send failed";
-        failures.push({ code, message });
+        const failure = { code, message };
+        if (code === "messaging/mismatched-credential") {
+          failure.hint =
+            "The device token was issued by a different Firebase project than FIREBASE_SERVICE_ACCOUNT_JSON on utils. " +
+            "Use one Firebase project for iOS GoogleService-Info.plist, Android google-services.json, and the server service account. " +
+            `Server project: ${getFirebaseProjectId() || "unknown"}. ` +
+            "iOS app must use GoogleService-Info.plist from the same project (serveaso-android, GCM_SENDER_ID 87480797347).";
+        }
+        if (
+          code === "messaging/third-party-auth-error" ||
+          code === "messaging/invalid-apns-credentials"
+        ) {
+          failure.hint =
+            "Firebase cannot authenticate with Apple Push Notification service (APNs). " +
+            "In Firebase Console → project serveaso-android → Project settings → Cloud Messaging, " +
+            "upload an APNs Authentication Key (.p8) with Key ID + Team ID 9RXM3W27X2 (Servease Innovation). " +
+            "Create the key at developer.apple.com → Keys → Apple Push Notifications service (NOT App Store Connect API). " +
+            "After uploading, send again — no app rebuild required.";
+        }
+        failures.push(failure);
         console.warn("[push] FCM delivery failed:", code, message);
         if (
           code === "messaging/registration-token-not-registered" ||
@@ -310,6 +333,7 @@ router.get("/stats", adminPushAuth, async (req, res) => {
     });
     return res.json({
       fcmReady: isFcmReady(),
+      firebaseProjectId: getFirebaseProjectId(),
       total,
       ios,
       android,

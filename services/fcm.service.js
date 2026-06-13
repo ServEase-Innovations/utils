@@ -7,6 +7,8 @@ const UTILS_ROOT = path.resolve(__dirname, "..");
 let admin = null;
 let initialized = false;
 let loadError = null;
+/** @type {string | null} */
+let firebaseProjectId = null;
 
 function resolveCredentialPath(filePath) {
   if (!filePath) return null;
@@ -48,6 +50,10 @@ function parseServiceAccountJson(raw) {
     : JSON.parse(Buffer.from(trimmed, "base64").toString("utf8"));
 }
 
+function rememberProjectId(cred) {
+  firebaseProjectId = cred?.project_id || null;
+}
+
 function initFromServiceAccountFile(filePath, firebaseAdmin) {
   if (!filePath) return false;
   const resolved = resolveCredentialPath(filePath);
@@ -56,7 +62,12 @@ function initFromServiceAccountFile(filePath, firebaseAdmin) {
   if (!firebaseAdmin.apps.length) {
     firebaseAdmin.initializeApp({ credential: firebaseAdmin.credential.cert(cred) });
   }
-  console.log("[fcm] Firebase Admin initialized from file:", resolved);
+  rememberProjectId(cred);
+  console.log(
+    "[fcm] Firebase Admin initialized from file:",
+    resolved,
+    firebaseProjectId ? `(project: ${firebaseProjectId})` : ""
+  );
   return true;
 }
 
@@ -73,7 +84,11 @@ function initFirebaseAdmin() {
     if (jsonRaw && String(jsonRaw).trim()) {
       const cred = parseServiceAccountJson(jsonRaw);
       firebaseAdmin.initializeApp({ credential: firebaseAdmin.credential.cert(cred) });
-      console.log("[fcm] Firebase Admin initialized from FIREBASE_SERVICE_ACCOUNT_JSON");
+      rememberProjectId(cred);
+      console.log(
+        "[fcm] Firebase Admin initialized from FIREBASE_SERVICE_ACCOUNT_JSON",
+        firebaseProjectId ? `(project: ${firebaseProjectId})` : ""
+      );
       initialized = true;
       return true;
     }
@@ -105,6 +120,11 @@ function initFirebaseAdmin() {
 
 function isFcmReady() {
   return initFirebaseAdmin();
+}
+
+function getFirebaseProjectId() {
+  initFirebaseAdmin();
+  return firebaseProjectId;
 }
 
 /**
@@ -162,4 +182,9 @@ async function sendToTokens({ title, body, tokens, data = {} }) {
   };
 }
 
-module.exports = { initFirebaseAdmin, isFcmReady, sendToTokens };
+module.exports = {
+  initFirebaseAdmin,
+  isFcmReady,
+  getFirebaseProjectId,
+  sendToTokens,
+};
