@@ -1002,6 +1002,17 @@ const DEFAULT_PLATFORM_SETTINGS = {
     /** Minutes after booking creation to send each payment-pending reminder (ascending). */
     paymentPendingOffsetsMinutes: [15, 60, 180],
   },
+  footer: {
+    helplinePhone: "+918792827744",
+    joinUsPhone: "+918792827754",
+    social: {
+      x: "https://x.com/ServEaso",
+      instagram: "https://www.instagram.com/serveaso?igsh=cHQxdmdubnZocjRn",
+      youtube: "https://www.youtube.com/@ServEaso",
+      linkedin: "https://www.linkedin.com/in/serveaso-media-7b7719381/",
+      facebook: "https://www.facebook.com/profile.php?id=61572701168852",
+    },
+  },
 };
 
 function deepMergePlatform(target, source) {
@@ -1062,6 +1073,43 @@ function sanitizeInt(v, min, max, fallback) {
   return Math.min(max, Math.max(min, n));
 }
 
+function sanitizeHttpUrl(v, fallback) {
+  const t = sanitizeString(v, 500);
+  if (!t) {
+    return fallback;
+  }
+  if (!/^https?:\/\//i.test(t)) {
+    return fallback;
+  }
+  return t;
+}
+
+function sanitizePhone(v, fallback) {
+  const t = sanitizeString(v, 40);
+  if (!t) {
+    return fallback;
+  }
+  const cleaned = t.replace(/[^\d+]/g, "");
+  return cleaned || fallback;
+}
+
+function sanitizeFooterBody(raw) {
+  const base = DEFAULT_PLATFORM_SETTINGS.footer;
+  const f = raw && typeof raw === "object" ? raw : {};
+  const s = f.social && typeof f.social === "object" ? f.social : {};
+  return {
+    helplinePhone: sanitizePhone(f.helplinePhone, base.helplinePhone),
+    joinUsPhone: sanitizePhone(f.joinUsPhone, base.joinUsPhone),
+    social: {
+      x: sanitizeHttpUrl(s.x, base.social.x),
+      instagram: sanitizeHttpUrl(s.instagram, base.social.instagram),
+      youtube: sanitizeHttpUrl(s.youtube, base.social.youtube),
+      linkedin: sanitizeHttpUrl(s.linkedin, base.social.linkedin),
+      facebook: sanitizeHttpUrl(s.facebook, base.social.facebook),
+    },
+  };
+}
+
 function sanitizePlatformBody(body) {
   const b = body && typeof body === "object" ? body : {};
   const f = b.features && typeof b.features === "object" ? b.features : {};
@@ -1070,6 +1118,7 @@ function sanitizePlatformBody(body) {
   const c = b.cancellation && typeof b.cancellation === "object" ? b.cancellation : {};
   const pr = b.providerReminders && typeof b.providerReminders === "object" ? b.providerReminders : {};
   const cr = b.customerReminders && typeof b.customerReminders === "object" ? b.customerReminders : {};
+  const footerIn = b.footer && typeof b.footer === "object" ? b.footer : undefined;
   return {
     platformName: sanitizeString(b.platformName, 200) ?? DEFAULT_PLATFORM_SETTINGS.platformName,
     supportEmail: sanitizeString(b.supportEmail, 200) ?? DEFAULT_PLATFORM_SETTINGS.supportEmail,
@@ -1139,6 +1188,7 @@ function sanitizePlatformBody(body) {
         DEFAULT_PLATFORM_SETTINGS.customerReminders.paymentPendingOffsetsMinutes
       ),
     },
+    footer: sanitizeFooterBody(footerIn ?? DEFAULT_PLATFORM_SETTINGS.footer),
   };
 }
 
@@ -1157,12 +1207,13 @@ function sanitizePaymentPendingOffsets(raw, fallback) {
   return normalized.length > 0 ? normalized : [...base];
 }
 
-/** Customer-safe subset (cancellation policy only). */
+/** Customer-safe subset (cancellation policy + footer contact/social). */
 async function getPublicPlatformSettings() {
   const full = await getPlatformSettings();
+  const defaults = cloneDefaults();
   return {
-    cancellation:
-      full?.cancellation ?? cloneDefaults().cancellation,
+    cancellation: full?.cancellation ?? defaults.cancellation,
+    footer: full?.footer ?? defaults.footer,
   };
 }
 
@@ -1213,6 +1264,7 @@ async function upsertPlatformSettings(body) {
       cancellation: { ...sanitized.cancellation },
       providerReminders: { ...sanitized.providerReminders },
       customerReminders: { ...sanitized.customerReminders },
+      footer: { ...sanitized.footer, social: { ...sanitized.footer.social } },
       updatedAt: now.toISOString(),
       updatedAt_epoch: Math.floor(now.getTime() / 1000),
       source: "database",
