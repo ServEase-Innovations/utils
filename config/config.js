@@ -48,6 +48,28 @@ for (const name of [".env.local", ".env.monorepo"]) {
 const { syncPostgresDbAliases, requirePostgresDatabaseName } = require("./postgresEnv.cjs");
 syncPostgresDbAliases(process.env);
 
+// Parse DATABASE_URL if present (Render, Supabase, etc.)
+let pgConfig = {
+  host: process.env.POSTGRES_HOST || process.env.DB_HOST || "127.0.0.1",
+  user: process.env.POSTGRES_USER || process.env.DB_USER,
+  password: process.env.POSTGRES_PASSWORD ?? process.env.DB_PASSWORD ?? "",
+  database: undefined,
+  port: Number(process.env.POSTGRES_PORT || process.env.DB_PORT || 5432),
+};
+
+if (process.env.DATABASE_URL) {
+  try {
+    const url = new URL(process.env.DATABASE_URL);
+    pgConfig.host = url.hostname || pgConfig.host;
+    pgConfig.user = url.username || pgConfig.user;
+    pgConfig.password = url.password || pgConfig.password;
+    pgConfig.database = url.pathname.replace(/^\//, "") || pgConfig.database;
+    pgConfig.port = url.port ? Number(url.port) : pgConfig.port;
+  } catch (err) {
+    console.error("⚠️ Failed to parse DATABASE_URL:", err.message);
+  }
+}
+
 let database;
 try {
   database = requirePostgresDatabaseName(process.env);
@@ -58,15 +80,14 @@ try {
   );
 }
 
+// Use parsed database name if we have it
+if (database) {
+  pgConfig.database = database;
+}
+
 module.exports = {
   env: ENV,
-  postgres: {
-    host: process.env.POSTGRES_HOST || process.env.DB_HOST || "127.0.0.1",
-    user: process.env.POSTGRES_USER || process.env.DB_USER,
-    password: process.env.POSTGRES_PASSWORD ?? process.env.DB_PASSWORD ?? "",
-    database,
-    port: Number(process.env.POSTGRES_PORT || process.env.DB_PORT || 5432),
-  },
+  postgres: pgConfig,
   mongo: {
     uri: process.env.MONGO_URI,
   },
